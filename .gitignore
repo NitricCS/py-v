@@ -10,3 +10,6 @@ venv
 gitlint.test
 *.diff
 launch.json
+
+programs
+.vscode
