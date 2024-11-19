@@ -70,7 +70,7 @@ class Simulator:
 
     def _log(self):
         self._log_cycle()
-        self._log_ports()
+        # self._log_ports()
 
     def tick(self):
         """Advance simulation to next cycle. Applies clock tick to registers

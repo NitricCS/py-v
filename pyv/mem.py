@@ -108,7 +108,7 @@ class Memory(Module, Clocked):
                 raise Exception(
                     f'ERROR (Memory ({self.name}), read): Invalid width {w}')
 
-            logger.debug(f"MEM ({self.name}): read value {val:08X} from address {addr:08X}")  # noqa: E501
+            logger.info(f"MEM ({self.name}): read value {val:08X} from address {addr:08X}")  # noqa: E501
         except IndexError:
             val = 0
 
@@ -151,7 +151,7 @@ class Memory(Module, Clocked):
             if not (w == 1 or w == 2 or w == 4):
                 raise Exception(
                     f'ERROR (Memory ({self.name}), write): Invalid width {w}')
-            logger.debug(
+            logger.info(
                 f"MEM {self.name}: write {wdata:08X} to address {addr:08X}")
 
             if w == 1:  # byte

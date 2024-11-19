@@ -103,7 +103,7 @@ class Regfile(Clocked):
             # because the decoder will only feed-in valid 5 bit indeces.
             try:
                 val = self.regs[reg]
-                logger.debug(f"Regfile READ: x{reg} = {val}")
+                logger.info(f"Regfile READ: x{reg} = {val}")
             except IndexError:
                 val = 0
 
@@ -136,7 +136,7 @@ class Regfile(Clocked):
         if not self.we:
             return
 
-        logger.debug(f"Regfile WRITE: x{self._nextWidx} changed from {self.regs[self._nextWidx]} to {self._nextWval}")  # noqa: E501
+        logger.info(f"Regfile WRITE: x{self._nextWidx} changed from {self.regs[self._nextWidx]} to {self._nextWval}")  # noqa: E501
         self.regs[self._nextWidx] = self._nextWval
 
         # TODO: Technically, it shouldn't be the regfile's responsibility to
