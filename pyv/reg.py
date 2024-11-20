@@ -59,7 +59,7 @@ class Reg(PyVObj, Clocked, Generic[T]):
 
     def _tick(self):
         if self._doReset:
-            logger.debug(f"Sync reset on register {self.name}. Reset value: {self._resetVal}.")  # noqa: E501
+            logger.info(f"Sync reset on register {self.name}. Reset value: {self._resetVal}.")  # noqa: E501
             self._reset()
         elif self._doTick:
             self.cur.write(self._nextv)

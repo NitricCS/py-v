@@ -72,11 +72,22 @@ def endless_loop():
 
     execute_bin(core_type, program_name, path_to_bin, num_cycles)
 
+def atoi():
+    core_type = "single"
+    program_name = "ATOI"
+    path_to_bin = "programs/atoi/atoi.bin"
+    num_cycles = 1000
+
+    core = execute_bin(core_type, program_name, path_to_bin, num_cycles)
+    print("Result = ", core.readDataMem(2048, 4))
+    print("\n")
+
 
 def main():
-    loop_acc()
-    fibonacci()
-    endless_loop()
+    # loop_acc()
+    # fibonacci()
+    # endless_loop()
+    atoi()
 
 
 if __name__ == '__main__':
