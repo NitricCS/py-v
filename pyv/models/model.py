@@ -7,7 +7,7 @@ class Model:
     """Base class for all core models.
     """
     def __init__(self):
-        print("Initializing model...")
+        # print("Initializing model...")
 
         self.sim = Simulator()
         """Simulator instance"""
@@ -44,6 +44,9 @@ class Model:
             probes (list[str]): List of strings to match ports to probe
         """
         self.sim.setProbes(probes)
+    
+    def setFICycle(self, fi_cycle: int):
+        self.sim.setFICycle(fi_cycle)
 
     def run(self, num_cycles=1):
         """Runs the simulation.

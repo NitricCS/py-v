@@ -61,6 +61,9 @@ class Simulator:
             probes (list[str]): List of strings to match ports to probe
         """
         PortList.filter(probes)
+    
+    def setFICycle(self, fi_cycle):
+        self._fi_cycle = fi_cycle
 
     def _log_cycle(self):
         logger.info(f"\n**** Cycle {self._cycles} ****")
@@ -145,7 +148,7 @@ class Simulator:
     def _process_changes(self):
         while len(self._change_queue) > 0:
             nextFn = self._change_queue.popleft()
-            logger.debug(f"Running {nextFn.__qualname__}")
+            logger.info(f"Running {nextFn.__qualname__}")
             nextFn()
 
     def _events_pending(self):
@@ -181,6 +184,9 @@ class Simulator:
             int: The current number of cycles.
         """
         return self._cycles
+    
+    def getFICycle(self):
+        return self._fi_cycle
 
     def postEventAbs(self, time_abs, callback):
         """Post an event into the future with *absolute* time.

@@ -1,35 +1,43 @@
 import time
+from pyv.isa import IllegalInstructionException
 from pyv.models.model import Model
 from pyv.models.singlecycle import SingleCycleModel
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 def execute_bin(
         core_type: str,
         program_name: str,
         path_to_bin: str,
-        num_cycles: int) -> Model:
-    print("===== " + program_name + " =====")
+        num_cycles: int,
+        fi_cycle: int = None) -> Model:
+    # print("===== " + program_name + " =====")
 
     # Create core instance
-    print("* Creating core instance...")
+    # print("* Creating core instance...")
     if core_type == 'single':
         core = SingleCycleModel()
 
     # Load binary into memory
-    print("* Loading binary...")
+    # print("* Loading binary...")
     core.load_binary(path_to_bin)
 
     # Set probes
     core.setProbes([])
 
+    # Set fault injection cycle
+    core.setFICycle(fi_cycle)
+
     # Simulate
-    print("* Starting simulation...\n")
+    # print("* Starting simulation...\n")
 
     start = time.perf_counter()
     core.run(num_cycles)
     end = time.perf_counter()
 
-    print(f"Simulation done at cycle {core.getCycles()} after {end-start}s.\n")
+    # print(f"Simulation done at cycle {core.getCycles()} after {end-start}s.\n")
 
     return core
 
@@ -72,22 +80,50 @@ def endless_loop():
 
     execute_bin(core_type, program_name, path_to_bin, num_cycles)
 
-def atoi():
+def atoi(fi_cycle):
     core_type = "single"
     program_name = "ATOI"
     path_to_bin = "programs/atoi/atoi.bin"
-    num_cycles = 1000
+    num_cycles = 800
 
-    core = execute_bin(core_type, program_name, path_to_bin, num_cycles)
-    print("Result = ", core.readDataMem(2048, 4))
-    print("\n")
+    print(f"FI on cycle {fi_cycle}...")
+    core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
+    res = core.readDataMem(2048, 4)
+    print("Result: ", res)
+    return res
 
 
 def main():
-    # loop_acc()
-    # fibonacci()
-    # endless_loop()
-    atoi()
+    cycles = [31, 36]
+    x = np.arange(cycles[0], cycles[1], 1)
+    fi_results = []
+    for i in range (cycles[0], cycles[1]):
+        try:
+            res = atoi(i)
+            if res[0] != "0xc":
+                fi_results.append("Target meet")
+                print("### TARGET MEET ###")
+            else:
+                fi_results.append("No effect")
+        except IllegalInstructionException:
+            fi_results.append("Other issue")
+            print("### ILLEGAL INSTRUCTION ###")
+        except IndexError:
+            fi_results.append("PC out of bound")
+            print("### PC OUT OF BOUND ###")
+    y = np.array(fi_results)
+    print(x, y)
+    y_mapping = {'Target meet': 3, 'Other issue': 2, 'PC out of bound': 1, 'No effect': 0}
+    y_mapped = [y_mapping[val] for val in y]
+
+    plt.figure(figsize=(10, 6))
+    plt.scatter(x, y_mapped, c='blue', marker='d')
+    plt.yticks(list(y_mapping.values()), list(y_mapping.keys()))
+    plt.xlabel('X-axis')
+    plt.ylabel('Y-axis')
+    plt.title('atoi')
+
+    plt.show()
 
 
 if __name__ == '__main__':

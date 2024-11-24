@@ -3,6 +3,7 @@ from pyv.module import Module
 from pyv.port import Input, Output, Wire, Constant
 from pyv.reg import Reg, Regfile
 from pyv.mem import ReadPort, WritePort
+from pyv.simulator import Simulator
 import pyv.isa as isa
 from pyv.util import getBit, getBits, MASK_32, XLEN, msb_32, signext
 from pyv.log import logger
@@ -141,16 +142,19 @@ class IDStage(Module):
         inst = val.inst
         self.pc = val.pc
         logger.info(f"Fetched instruction code: {inst:08X}")
-        
+
+        curr_cycle = Simulator.globalSim.getCycles() - 1
+        fi_cycle = Simulator.globalSim.getFICycle()
 
         # Determine opcode (inst[6:2])
         opcode = getBits(inst, 6, 2)
         if opcode == 12:
             logger.info(f"Opcode: {opcode:08X}")
-            if self.pc > 7760 and self.pc < 7780:
-                ### Inject fault
-                inst = inst | (1<<15)
-                logger.info(f"Instruction after FI: {inst:08X}")
+
+        if curr_cycle == fi_cycle:
+            ### Inject fault
+            inst = inst | (1 << 16)
+            logger.info(f"Instruction after FI: {inst:08X}")
 
         # funct3, funct7
         funct3 = getBits(inst, 14, 12)

@@ -1,5 +1,5 @@
 import logging
-
+from datetime import datetime
 
 def getLogger():
     logger = logging.getLogger()
@@ -9,7 +9,10 @@ def getLogger():
 
     formatter = logging.Formatter('%(name)15s: %(message)s')
     stream_handler = logging.StreamHandler()
-    file_handler = logging.FileHandler("run.log", 'w')
+
+    now = datetime.now().strftime("%Y%m%d-%H%M%S")
+    file_handler = logging.FileHandler(f"logs/run-{now}.log", 'a')
+    
     stream_handler.setFormatter(formatter)
     # file_handler.setFormatter(formatter)
 
