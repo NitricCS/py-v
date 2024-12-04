@@ -168,7 +168,7 @@ class PortRW(Port, Generic[T]):
     def _propagate(self, oldVal: T, newVal: T):
         """Propagate a value change.
         """
-        logger.debug(f"Port {self.name} changed from {oldVal} to {newVal}.")
+        logger.info(f"Port {self.name} changed from {oldVal} to {newVal}.")
 
         for port in self._downstreamInputs:
             logger.debug(f"Notifying {port.name}")

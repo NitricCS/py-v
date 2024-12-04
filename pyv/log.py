@@ -10,8 +10,8 @@ def getLogger():
     formatter = logging.Formatter('%(name)15s: %(message)s')
     stream_handler = logging.StreamHandler()
 
-    now = datetime.now().strftime("%Y%m%d-%H%M%S")
-    file_handler = logging.FileHandler(f"logs/run-{now}.log", 'a')
+    # now = datetime.now().strftime("%Y%m%d-%H%M%S")
+    file_handler = logging.FileHandler(f"logs/run.log", 'w')
     
     stream_handler.setFormatter(formatter)
     # file_handler.setFormatter(formatter)

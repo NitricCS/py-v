@@ -49,6 +49,7 @@ class Simulator:
         self._change_queue = deque()
         self._event_queue = _EventQueue()
         self._cycles = 0
+        self._fi_cycle = None
 
     def setProbes(self, probes: list[str] = []):
         """Setup probes for ports.
@@ -73,7 +74,7 @@ class Simulator:
 
     def _log(self):
         self._log_cycle()
-        # self._log_ports()
+        self._log_ports()
 
     def tick(self):
         """Advance simulation to next cycle. Applies clock tick to registers
@@ -141,6 +142,7 @@ class Simulator:
     @staticmethod
     def clear():
         """Clear list of registers, memories and ports"""
+        Clock.reset()
         Clock.clear()
         PortList.clear()
         Simulator._stable_callbacks = []
@@ -186,7 +188,9 @@ class Simulator:
         return self._cycles
     
     def getFICycle(self):
-        return self._fi_cycle
+        if self._fi_cycle:
+            return self._fi_cycle
+        return None
 
     def postEventAbs(self, time_abs, callback):
         """Post an event into the future with *absolute* time.

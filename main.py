@@ -2,6 +2,7 @@ import time
 from pyv.isa import IllegalInstructionException
 from pyv.models.model import Model
 from pyv.models.singlecycle import SingleCycleModel
+from pyv.simulator import Simulator
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,7 +29,8 @@ def execute_bin(
     core.setProbes([])
 
     # Set fault injection cycle
-    core.setFICycle(fi_cycle)
+    if fi_cycle:
+        core.setFICycle(fi_cycle)
 
     # Simulate
     # print("* Starting simulation...\n")
@@ -42,43 +44,43 @@ def execute_bin(
     return core
 
 
-def loop_acc():
-    core_type = 'single'
-    program_name = 'LOOP_ACC'
-    path_to_bin = 'programs/loop_acc/loop_acc.bin'
-    num_cycles = 2010
+# def loop_acc():
+#     core_type = 'single'
+#     program_name = 'LOOP_ACC'
+#     path_to_bin = 'programs/loop_acc/loop_acc.bin'
+#     num_cycles = 2010
 
-    core = execute_bin(core_type, program_name, path_to_bin, num_cycles)
+#     core = execute_bin(core_type, program_name, path_to_bin, num_cycles)
 
-    # Print register and memory contents
-    print("x1 = " + str(core.readReg(1)))
-    print("x2 = " + str(core.readReg(2)))
-    print("x5 = " + str(core.readReg(5)))
-    print("pc = " + str(hex(core.readPC())))
-    print("mem@4096 = ", core.readDataMem(4096, 4))
-    print("")
-
-
-def fibonacci():
-    core_type = 'single'
-    program_name = 'FIBONACCI'
-    path_to_bin = 'programs/fibonacci/fibonacci.bin'
-    num_cycles = 140
-
-    core = execute_bin(core_type, program_name, path_to_bin, num_cycles)
-
-    # Print result
-    print("Result = ", core.readDataMem(2048, 4))
-    print("")
+#     # Print register and memory contents
+#     print("x1 = " + str(core.readReg(1)))
+#     print("x2 = " + str(core.readReg(2)))
+#     print("x5 = " + str(core.readReg(5)))
+#     print("pc = " + str(hex(core.readPC())))
+#     print("mem@4096 = ", core.readDataMem(4096, 4))
+#     print("")
 
 
-def endless_loop():
-    core_type = 'single'
-    program_name = 'ENDLESS_LOOP'
-    path_to_bin = 'programs/endless_loop/endless_loop.bin'
-    num_cycles = 1000
+# def fibonacci():
+#     core_type = 'single'
+#     program_name = 'FIBONACCI'
+#     path_to_bin = 'programs/fibonacci/fibonacci.bin'
+#     num_cycles = 140
 
-    execute_bin(core_type, program_name, path_to_bin, num_cycles)
+#     core = execute_bin(core_type, program_name, path_to_bin, num_cycles)
+
+#     # Print result
+#     print("Result = ", core.readDataMem(2048, 4))
+#     print("")
+
+
+# def endless_loop():
+#     core_type = 'single'
+#     program_name = 'ENDLESS_LOOP'
+#     path_to_bin = 'programs/endless_loop/endless_loop.bin'
+#     num_cycles = 1000
+
+#     execute_bin(core_type, program_name, path_to_bin, num_cycles)
 
 def atoi(fi_cycle):
     core_type = "single"
@@ -88,15 +90,14 @@ def atoi(fi_cycle):
 
     print(f"FI on cycle {fi_cycle}...")
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
-    res = core.readDataMem(2048, 4)
-    print("Result: ", res)
-    return res
+    return core.readDataMem(2048, 4)
 
 
 def main():
-    cycles = [31, 36]
+    cycles = [30, 70]
     x = np.arange(cycles[0], cycles[1], 1)
     fi_results = []
+    res = []
     for i in range (cycles[0], cycles[1]):
         try:
             res = atoi(i)
@@ -105,15 +106,18 @@ def main():
                 print("### TARGET MEET ###")
             else:
                 fi_results.append("No effect")
+            print(res)
         except IllegalInstructionException:
-            fi_results.append("Other issue")
-            print("### ILLEGAL INSTRUCTION ###")
-        except IndexError:
             fi_results.append("PC out of bound")
             print("### PC OUT OF BOUND ###")
+        except IndexError:
+            fi_results.append("Other issue")
+            print("### MEMORY INDEX ERROR ###")
+        finally:
+            Simulator.globalSim.clear()
+
     y = np.array(fi_results)
-    print(x, y)
-    y_mapping = {'Target meet': 3, 'Other issue': 2, 'PC out of bound': 1, 'No effect': 0}
+    y_mapping = {'Target meet': 3, 'PC out of bound': 2, 'Other issue': 1, 'No effect': 0}
     y_mapped = [y_mapping[val] for val in y]
 
     plt.figure(figsize=(10, 6))
@@ -121,6 +125,7 @@ def main():
     plt.yticks(list(y_mapping.values()), list(y_mapping.keys()))
     plt.xlabel('X-axis')
     plt.ylabel('Y-axis')
+    plt.xticks(np.arange(min(x), max(x)+1, 2.0))
     plt.title('atoi')
 
     plt.show()
