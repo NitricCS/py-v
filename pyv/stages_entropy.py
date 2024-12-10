@@ -4,6 +4,7 @@ from pyv.port import Input, Output, Wire, Constant
 from pyv.reg import Reg, Regfile
 from pyv.mem import ReadPort, WritePort
 from pyv.simulator import Simulator
+from pyv.extractor import IFXT_t, XTIF_t
 import pyv.isa as isa
 from pyv.util import getBit, getBits, MASK_32, XLEN, msb_32, signext
 from pyv.log import logger
@@ -85,17 +86,32 @@ class IFStage(Module):
         self.npc_i = Input(int)
         self.IFID_o = Output(IFID_t)
 
+        # Input from entropy extractor 
+        self.ext_i = Input(XTIF_t)
+        # Output to entropy extractor
+        self.ext_o = Output(IFXT_t)
+
         # Program counter (PC)
         self.pc_reg = Reg(int, -4)
 
         # Instruction register (IR)
         self.ir_reg = Reg(int, 0x00000013)
 
+        # Entropy bits register
+        # TODO utilize this for output further down the stages and up the structure
+        # TODO add output
+        self.eb_reg = Reg(list, [])
+
         # Helper wires
         self.pc_reg_w = Wire(int, [self.writeOutput])
         self.ir_reg_w = Wire(int, [self.writeOutput])
         self.pc_reg_w << self.pc_reg.cur
         self.ir_reg_w << self.ir_reg.cur
+
+        self.eb_reg_w = Wire(list, [self.writeOutput])
+        self.eb_reg_w << self.eb_reg.cur
+        self.eb_reg.next << self.ext_i
+        # TODO utilize write() method on wire in process() to assign a value
 
         # Instruction memory
         # Force read-enable
