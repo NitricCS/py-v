@@ -14,6 +14,7 @@ def extractor():
 
 class TestEntropyExtractor():
     # initialization and base functionality
+    @pytest.mark.current
     def test_extractor(self, sim: Simulator, extractor: Extractor):
         # set input
         extractor.IFXT_i.write(IFXT_t(0xfaa42633))
