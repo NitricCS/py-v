@@ -21,7 +21,6 @@ class TXT_t:
 
 @dataclass
 class XTIF_t:
-    entropy_bits: list = field(default_factory=list)
     active: bool = False
     ready: bool = False
     flush_bits: bool = False
@@ -34,7 +33,8 @@ class Extractor(Module):
         TXT_t:  Interface from top (memory flush ready signal)
     
     Outputs:
-        XTIF_t: Interface to IFStage (entropy bits, active, ready)
+        XTIF_t: Interface to IFStage (active, ready, flush)
+        eb_o: Entropy bits output
     """
 
     def __init__(self, regf: Regfile, csr: CSRUnit):
@@ -47,11 +47,10 @@ class Extractor(Module):
         self.active_out = True
         self.flush_bits = False
 
-        # self.registerStableCallbacks([self.check_exception])
-
-        self.IFXT_i = Input(IFXT_t)
-        self.TXT_i = Input(TXT_t)
-        self.XTIF_o = Output(XTIF_t)
+        self.IFXT_i = Input(IFXT_t)     # fetch module in: instruction
+        self.TXT_i = Input(TXT_t)       # top in
+        self.XTIF_o = Output(XTIF_t)    # signals out
+        self.eb_o = Output(list)        # entropy bits out
     
     def process(self):
         top_val: TXT_t = self.TXT_i.read()
@@ -86,8 +85,9 @@ class Extractor(Module):
 
         # write output
         self.XTIF_o.write(XTIF_t(
-            self.entropy_bits, self.active_out, self.ready_out, self.flush_bits
+            self.active_out, self.ready_out, self.flush_bits
         ))
+        self.eb_o.write(self.entropy_bits)
     
     def get_entropy_bits(self, funct7):
         bit_high = getBit(funct7, 6)

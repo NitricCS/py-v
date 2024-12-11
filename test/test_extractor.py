@@ -22,7 +22,8 @@ class TestEntropyExtractor():
 
         # read output and verify
         out: XTIF_t = extractor.XTIF_o.read()
-        assert out.entropy_bits == [61]
+        eb_out = extractor.eb_o.read()
+        assert eb_out == [61]
         assert not out.ready
         assert out.active
         assert not out.flush_bits
@@ -50,9 +51,10 @@ class TestEntropyExtractor():
         sim.step()
 
         # read output and verify
-        out: XTIF_t = extractor.XTIF_o.read()
-        assert len(out.entropy_bits) == 2
-        assert out.entropy_bits == [61, 60]
+        eb_out = extractor.eb_o.read()
+        out = extractor.XTIF_o.read()
+        assert len(eb_out) == 2
+        assert eb_out == [61, 60]
         assert not out.flush_bits
     
     # flush signal
@@ -69,9 +71,10 @@ class TestEntropyExtractor():
             sim.step()
 
         # validate output
+        eb_out = extractor.eb_o.read()
         out: XTIF_t = extractor.XTIF_o.read()
-        assert len(out.entropy_bits) == 16
-        assert out.entropy_bits == [61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60]
+        assert len(eb_out) == 16
+        assert eb_out == [61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60]
         assert out.flush_bits
 
         # mimic flush ready signal

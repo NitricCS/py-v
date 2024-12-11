@@ -1,7 +1,9 @@
 from unittest.mock import MagicMock, patch
 import pytest
+from tabulate import tabulate
 from pyv.csr import CSRUnit
 from pyv.simulator import Simulator
+from pyv.extractor import Extractor
 from pyv.stages_entropy import IFStage, IDStage, EXStage, MEMStage, WBStage, BranchUnit, IFID_t, IDEX_t, EXMEM_t, MEMWB_t
 from pyv.reg import Regfile
 from pyv.util import MASK_32
@@ -40,25 +42,102 @@ def test_data_types():
 # ---------------------------------------
 # Test FETCH
 # ---------------------------------------
-@pytest.mark.extraction
-@pytest.mark.regression
-def test_IFStage(sim):
-    imem = Memory(1024)
-    imem._init()
-    fetch = IFStage(imem.read_port1)
-    fetch._init()
+class TestIFStage:
+    @pytest.fixture(scope='function')
+    def imem(self):
+        imem = Memory(1024)
+        imem._init()
+        return imem
 
-    # SW a0,-20(s0) = SW, x10, -20(x8)
-    # 0xfea42623
-    imem.mem[0:4] = [0x23, 0x26, 0xa4, 0xfe]
+    @pytest.fixture(scope='function')
+    def extractor(self):
+        regf = Regfile()
+        csr = CSRUnit()
+        extractor = Extractor(regf, csr)
+        extractor._init()
+        return extractor
+    
+    @pytest.fixture(scope='function')
+    def fetch(self, imem):
+        fetch = IFStage(imem.read_port1)
+        fetch._init()
+        return fetch
 
-    fetch.npc_i.write(0x00000000)
-    sim.step()
+    @pytest.mark.extraction
+    @pytest.mark.regression
+    def test_IFStage(self, sim, imem, fetch):
+        # SW a0,-20(s0) = SW, x10, -20(x8)
+        # 0xfea42623
+        imem.mem[0:4] = [0x23, 0x26, 0xa4, 0xfe]
 
-    out = fetch.IFID_o.read()
-    assert out.inst == 0xfea42623
-    assert out.pc == 0x00000000
+        fetch.npc_i.write(0x00000000)
+        sim.step()
 
+        out = fetch.IFID_o.read()
+        assert out.inst == 0xfea42623
+        assert out.pc == 0x00000000
+  
+    @pytest.mark.extraction
+    def test_IF_XT_integr(self, sim, extractor, fetch, imem):
+        extractor.IFXT_i << fetch.IFXT_o
+        fetch.eb_i << extractor.eb_o
+
+        imem.mem[0:4] = [0x33, 0x26, 0xa4, 0xfa]
+        fetch.npc_i.write(0x00000000)
+        sim.step()
+
+        # verify that extractor receives instruction and returns correct entropy
+        if_out = fetch.IFXT_o.read()
+        assert if_out.inst == 0xfaa42633       # correct instruction out of fetch
+        ext_in = extractor.IFXT_i.read()
+        assert ext_in.inst == 0xfaa42633       # correct instruction enters extractor
+        ext_out = extractor.eb_o.read()
+        assert ext_out == [61]                 # correct entropy out of extractor
+        if_in = fetch.eb_i.read()
+        assert if_in == [61]                   # correct entropy enters fetch
+
+        sim.step()
+
+        out_eb = fetch.ext_o.read()
+        assert out_eb == [61]                  # correct entropy leaves fetch on next cycle
+    
+    @pytest.mark.extraction
+    def test_IF_XT_flow(self, sim, extractor, fetch, imem):
+        extractor.IFXT_i << fetch.IFXT_o
+        fetch.eb_i << extractor.eb_o
+
+        # initialize instruction memory
+        for i in range(0, 64, 8):
+            imem.mem[i:i+4] = [0x33, 0x26, 0xa4, 0xfa]
+            imem.mem[i+4:i+8] = [0x33, 0x26, 0xa4, 0xf8]
+        pc = 0x00000000
+
+        headers = ["Instruction", "Entropy HEX", "Entropy BIN"]
+        instruction = 0
+        results = []
+        for _ in range(0, 16):
+            fetch.npc_i.write(pc)     # send PC to fetch
+            sim.step()                # run a cycle
+            fetch_out = fetch.IFID_o.read()
+            inst_nxt = fetch_out.inst          # need to remember this
+            fetch_eb = fetch.ext_o.read()
+            if fetch_eb:
+                entropy = fetch_eb[-1]
+            pc += 4
+            if instruction != 0:
+                results.append([instruction, hex(entropy), bin(entropy)])
+            instruction = inst_nxt
+        
+        sim.step()                    # one more for good measure (entropy propagates)
+        out_eb = fetch.ext_o.read()
+        entropy = out_eb[-1]
+        results.append([instruction, hex(entropy), bin(entropy)])
+
+        with open("test.log", "w") as f:
+            f.write(tabulate(results, headers=headers))
+        
+        assert len(out_eb) == 16
+        assert out_eb == [61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60]
 
 # ---------------------------------------
 # Test DECODE

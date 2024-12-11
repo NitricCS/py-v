@@ -74,10 +74,13 @@ class IFStage(Module):
     """Instruction Fetch Stage.
 
     Inputs:
-        npc_i: Next program counter (PC).
+        npc_i: Next program counter (PC)
+        eb_i: Input from entropy extractor (entropy bits)
 
     Outputs:
-        IFID_o: Interface to IDStage.
+        IFID_o: Interface to IDStage
+        IFXT_o: Interface to entropy extractor (instruction)
+        ext_o: Entropy bits output
     """
 
     def __init__(self, imem: ReadPort):
@@ -87,22 +90,16 @@ class IFStage(Module):
         self.IFID_o = Output(IFID_t)
 
         #### Entropy extractor integration
-        # Output to entropy extractor: instruction
-        self.IFXT_o = Output(IFXT_t)
-        # Input from entropy extractor: entropybits, active, ready 
-        self.XTIF_i = Input(XTIF_t)
-        # Output of entropy bits from IF outside
-        self.ext_o = Output(list)
-        # Entropy bits register
-        self.eb_reg = Reg(list, [])
-        # Wires
-        self.eb_ext_i_w = Wire(list)          # wire to put entropy bits through
-                                              # takes value from XTIF_i
-        self.eb_reg.next << self.eb_ext_i_w   # entropy bits connected to next value
+        self.IFXT_o = Output(IFXT_t)     # output to extractor: instruction
+        self.XTIF_i = Input(XTIF_t)      # input from extractor: active, ready 
+        self.eb_i = Input(list)          # input from entropy extractor: entropybits
+        self.ext_o = Output(list)        # output of entropy bits from IF out
 
-        self.eb_reg_w = Wire(list, [self.writeOutput])    # wire to output entropy
-        self.eb_reg_w << self.eb_reg.cur                  # connect current entropy to out
-        ### End of entropy extractor integration
+        self.eb_reg = Reg(list, [])      # entropy bits register
+        
+        self.eb_reg_w = Wire(list, [self.writeOutput])   # wire to output entropy
+        self.eb_reg_w << self.eb_reg.cur                 # connect current entropy to out
+        self.eb_reg.next << self.eb_i                    # next register value is what extractor returns
 
         # Program counter (PC)
         self.pc_reg = Reg(int, -4)
@@ -127,16 +124,11 @@ class IFStage(Module):
 
         # Connect next PC to input of PC reg
         self.pc_reg.next << self.npc_i
-    
-    def process(self):
-        ext: XTIF_t = self.XTIF_i.read()
-        entropy = ext.entropy_bits
-        self.eb_ext_i_w.write(entropy)
 
     def writeOutput(self):
         self.IFID_o.write(IFID_t(self.ir_reg_w.read(), self.pc_reg_w.read()))
-        self.IFXT_o.write(IFXT_t(self.ir_reg_w.read()))
-        self.ext_o.write(self.eb_reg_w.read())
+        self.IFXT_o.write(IFXT_t(self.ir_reg_w.read()))      # output instruction to extractor
+        self.ext_o.write(self.eb_reg_w.read())               # output entropy
 
 
 class IDStage(Module):

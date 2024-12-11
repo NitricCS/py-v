@@ -3,3 +3,4 @@ pdoc
 coverage
 flake8
 gitlint
+tabulate
