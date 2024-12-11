@@ -14,7 +14,7 @@ def extractor():
 
 class TestEntropyExtractor():
     # initialization and base functionality
-    @pytest.mark.current
+    @pytest.mark.extraction
     def test_extractor(self, sim: Simulator, extractor: Extractor):
         # set input
         extractor.IFXT_i.write(IFXT_t(0xfaa42633))
@@ -28,6 +28,7 @@ class TestEntropyExtractor():
         assert not out.flush_bits
     
     # active/ready functionality
+    @pytest.mark.extraction
     def test_extractor_stop(self, sim: Simulator, extractor: Extractor):
         # set input
         extractor.IFXT_i.write(IFXT_t(0xffffffff))
@@ -39,6 +40,7 @@ class TestEntropyExtractor():
         assert not out.active
     
     # enrtopy list forming
+    @pytest.mark.extraction
     def test_extractor_consecutive(self, sim: Simulator, extractor: Extractor):
         # set input
         extractor.IFXT_i.write(IFXT_t(0xfaa42633))  # entropy = 61
@@ -54,6 +56,7 @@ class TestEntropyExtractor():
         assert not out.flush_bits
     
     # flush signal
+    @pytest.mark.extraction
     def test_extractor_flush_signal(self, sim: Simulator, extractor: Extractor):
         extractor.TXT_i.write(TXT_t(False))
         # 16 cycles

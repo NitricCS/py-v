@@ -86,10 +86,23 @@ class IFStage(Module):
         self.npc_i = Input(int)
         self.IFID_o = Output(IFID_t)
 
-        # Input from entropy extractor 
-        self.ext_i = Input(XTIF_t)
-        # Output to entropy extractor
-        self.ext_o = Output(IFXT_t)
+        #### Entropy extractor integration
+        # Output to entropy extractor: instruction
+        self.IFXT_o = Output(IFXT_t)
+        # Input from entropy extractor: entropybits, active, ready 
+        self.XTIF_i = Input(XTIF_t)
+        # Output of entropy bits from IF outside
+        self.ext_o = Output(list)
+        # Entropy bits register
+        self.eb_reg = Reg(list, [])
+        # Wires
+        self.eb_ext_i_w = Wire(list)          # wire to put entropy bits through
+                                              # takes value from XTIF_i
+        self.eb_reg.next << self.eb_ext_i_w   # entropy bits connected to next value
+
+        self.eb_reg_w = Wire(list, [self.writeOutput])    # wire to output entropy
+        self.eb_reg_w << self.eb_reg.cur                  # connect current entropy to out
+        ### End of entropy extractor integration
 
         # Program counter (PC)
         self.pc_reg = Reg(int, -4)
@@ -97,21 +110,11 @@ class IFStage(Module):
         # Instruction register (IR)
         self.ir_reg = Reg(int, 0x00000013)
 
-        # Entropy bits register
-        # TODO utilize this for output further down the stages and up the structure
-        # TODO add output
-        self.eb_reg = Reg(list, [])
-
         # Helper wires
         self.pc_reg_w = Wire(int, [self.writeOutput])
         self.ir_reg_w = Wire(int, [self.writeOutput])
         self.pc_reg_w << self.pc_reg.cur
         self.ir_reg_w << self.ir_reg.cur
-
-        self.eb_reg_w = Wire(list, [self.writeOutput])
-        self.eb_reg_w << self.eb_reg.cur
-        self.eb_reg.next << self.ext_i
-        # TODO utilize write() method on wire in process() to assign a value
 
         # Instruction memory
         # Force read-enable
@@ -124,9 +127,16 @@ class IFStage(Module):
 
         # Connect next PC to input of PC reg
         self.pc_reg.next << self.npc_i
+    
+    def process(self):
+        ext: XTIF_t = self.XTIF_i.read()
+        entropy = ext.entropy_bits
+        self.eb_ext_i_w.write(entropy)
 
     def writeOutput(self):
         self.IFID_o.write(IFID_t(self.ir_reg_w.read(), self.pc_reg_w.read()))
+        self.IFXT_o.write(IFXT_t(self.ir_reg_w.read()))
+        self.ext_o.write(self.eb_reg_w.read())
 
 
 class IDStage(Module):
