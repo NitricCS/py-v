@@ -134,6 +134,7 @@ class TestIFStage:
         results.append([instruction, hex(entropy), bin(entropy)])
 
         with open("test.log", "w") as f:
+            f.write("=== Integration Test: Entropy Extractor in Fetch ===\n\n")
             f.write(tabulate(results, headers=headers))
         
         assert len(out_eb) == 16
