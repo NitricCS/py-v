@@ -80,7 +80,7 @@ class TestIFStage:
     @pytest.mark.extraction
     def test_IF_XT_integr(self, sim, extractor, fetch, imem):
         extractor.IFXT_i << fetch.IFXT_o
-        fetch.eb_i << extractor.eb_o
+        fetch.XTIF_i << extractor.XTIF_o
 
         imem.mem[0:4] = [0x33, 0x26, 0xa4, 0xfa]
         fetch.npc_i.write(0x00000000)
@@ -91,20 +91,36 @@ class TestIFStage:
         assert if_out.inst == 0xfaa42633       # correct instruction out of fetch
         ext_in = extractor.IFXT_i.read()
         assert ext_in.inst == 0xfaa42633       # correct instruction enters extractor
-        ext_out = extractor.eb_o.read()
+        ext_out = extractor.XTIF_o.read().entropy
         assert ext_out == [61]                 # correct entropy out of extractor
-        if_in = fetch.eb_i.read()
+        if_in = fetch.XTIF_i.read().entropy
         assert if_in == [61]                   # correct entropy enters fetch
 
         sim.step()
 
-        out_eb = fetch.ext_o.read()
-        assert out_eb == [61]                  # correct entropy leaves fetch on next cycle
+        out_xt = fetch.XT_o.read()
+        assert out_xt.entropy ==  [61]
+        assert not out_xt.ready
+        assert out_xt.active
+        assert not out_xt.flush_bits
+    
+    @pytest.mark.extraction
+    def test_IF_XT_signals(self, sim, extractor, fetch, imem):
+        extractor.IFXT_i << fetch.IFXT_o
+        fetch.XTIF_i << extractor.XTIF_o
+
+        imem.mem[0:4] = [0xff, 0xff, 0xff, 0xff]
+        fetch.npc_i.write(0x00000000)
+        sim.step()
+
+        out_xt = fetch.XT_o.read()
+        assert out_xt.ready
+        assert not out_xt.active
     
     @pytest.mark.extraction
     def test_IF_XT_flow(self, sim, extractor, fetch, imem):
         extractor.IFXT_i << fetch.IFXT_o
-        fetch.eb_i << extractor.eb_o
+        fetch.XTIF_i << extractor.XTIF_o
 
         # initialize instruction memory
         for i in range(0, 64, 8):
@@ -120,7 +136,7 @@ class TestIFStage:
             sim.step()                # run a cycle
             fetch_out = fetch.IFID_o.read()
             inst_nxt = fetch_out.inst          # need to remember this
-            fetch_eb = fetch.ext_o.read()
+            fetch_eb = fetch.XT_o.read().entropy
             if fetch_eb:
                 entropy = fetch_eb[-1]
             pc += 4
@@ -129,16 +145,17 @@ class TestIFStage:
             instruction = inst_nxt
         
         sim.step()                    # one more for good measure (entropy propagates)
-        out_eb = fetch.ext_o.read()
-        entropy = out_eb[-1]
+        out_xt = fetch.XT_o.read()
+        entropy = out_xt.entropy[-1]
         results.append([instruction, hex(entropy), bin(entropy)])
 
         with open("test.log", "w") as f:
             f.write("=== Integration Test: Entropy Extractor in Fetch ===\n\n")
             f.write(tabulate(results, headers=headers))
         
-        assert len(out_eb) == 16
-        assert out_eb == [61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60]
+        assert len(out_xt.entropy) == 16
+        assert out_xt.entropy == [61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60]
+        assert out_xt.flush_bits
 
 # ---------------------------------------
 # Test DECODE

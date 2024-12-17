@@ -21,6 +21,7 @@ class TXT_t:
 
 @dataclass
 class XTIF_t:
+    entropy: list = field(default_factory=list)
     active: bool = False
     ready: bool = False
     flush_bits: bool = False
@@ -39,13 +40,16 @@ class Extractor(Module):
 
     def __init__(self, regf: Regfile, csr: CSRUnit):
         super().__init__()
-        self.entropy_bits = []     # TODO turn into a register
         self.regfile = regf
         self.csr = csr
         self.ready = False
         self.ready_out = False
         self.active_out = True
         self.flush_bits = False
+
+        self.eb_reg = Reg(list, [])      # entropy bits register
+        self.eb_reg_w = Wire(list)
+        self.eb_reg_w << self.eb_reg.cur
 
         self.IFXT_i = Input(IFXT_t)     # fetch module in: instruction
         self.TXT_i = Input(TXT_t)       # top in
@@ -58,6 +62,8 @@ class Extractor(Module):
 
         val: IFXT_t = self.IFXT_i.read()
         inst = val.inst
+
+        entropy_list = self.eb_reg_w.read()
 
         # set ready signal
         if inst == STOP_INSTR:
@@ -75,19 +81,21 @@ class Extractor(Module):
         funct7 = getBits(inst, 31, 25)
         # Get entropy bits from funct7
         if opcode == isa.OPCODES['OP']:
-            self.entropy_bits.append(self.get_entropy_bits(funct7))
+            entropy = self.get_entropy_bits(funct7)
+            entropy_list.append(entropy)
+            self.eb_reg.next.write(entropy_list)
 
         # set flush signal
-        if (self.flush_bits or len(self.entropy_bits) == 16 or (self.ready and len(self.entropy_bits) > 0)) and not flush_ready:
+        if (self.flush_bits or len(entropy_list) == 16 or (self.ready and len(entropy_list) > 0)) and not flush_ready:
             self.flush_bits = True
         else:
             self.flush_bits = False
 
         # write output
         self.XTIF_o.write(XTIF_t(
-            self.active_out, self.ready_out, self.flush_bits
+            self.eb_reg_w.read(), self.active_out, self.ready_out, self.flush_bits
         ))
-        self.eb_o.write(self.entropy_bits)
+        self.eb_o.write(self.eb_reg_w.read())
     
     def get_entropy_bits(self, funct7):
         bit_high = getBit(funct7, 6)

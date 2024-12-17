@@ -22,8 +22,8 @@ class TestEntropyExtractor():
 
         # read output and verify
         out: XTIF_t = extractor.XTIF_o.read()
-        eb_out = extractor.eb_o.read()
-        assert eb_out == [61]
+        # eb_out = extractor.eb_o.read()
+        assert out.entropy == [61]
         assert not out.ready
         assert out.active
         assert not out.flush_bits
@@ -45,6 +45,25 @@ class TestEntropyExtractor():
     def test_extractor_consecutive(self, sim: Simulator, extractor: Extractor):
         # set input
         extractor.IFXT_i.write(IFXT_t(0xfaa42633))  # entropy = 61
+        sim.step()
+
+        extractor.IFXT_i.write(IFXT_t(0xf8a42633))  # entropy = 60
+        sim.step()
+
+        # read output and verify
+        eb_out = extractor.eb_o.read()
+        out = extractor.XTIF_o.read()
+        assert len(eb_out) == 2
+        assert eb_out == [61, 60]
+        assert not out.flush_bits
+    
+    @pytest.mark.extraction
+    def test_extractor_mixed_instructions(self, sim: Simulator, extractor: Extractor):
+        # set input
+        extractor.IFXT_i.write(IFXT_t(0xfaa42633))  # entropy = 61
+        sim.step()
+
+        extractor.IFXT_i.write(IFXT_t(0xf8a42637))  # not R type
         sim.step()
 
         extractor.IFXT_i.write(IFXT_t(0xf8a42633))  # entropy = 60
