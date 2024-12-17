@@ -92,17 +92,8 @@ class IFStage(Module):
         #### Entropy extractor integration
         self.IFXT_o = Output(IFXT_t)     # output to extractor: instruction
         self.XTIF_i = Input(XTIF_t)      # input from extractor: entropy, active, ready 
-        # self.eb_i = Input(list)          # input from entropy extractor: entropybits
-        # self.ext_o = Output(list)        # output of entropy bits from IF out
         self.XT_o = Output(XTIF_t)       # output of entropy and signals from IF out
-
-        # self.eb_reg = Reg(list, [])      # entropy bits register
-        
-        # self.eb_reg_w = Wire(list, [self.writeOutput])   # wire to output entropy
         self.XT_w = Wire(XTIF_t, [self.writeOutput])
-        # self.eb_reg_w << self.eb_reg.cur                 # connect current entropy to out
-        # self.eb_reg.next << self.eb_i                    # next register value is what extractor returns
-
         self.XT_w << self.XTIF_i
 
         # Program counter (PC)
@@ -132,7 +123,6 @@ class IFStage(Module):
     def writeOutput(self):
         self.IFID_o.write(IFID_t(self.ir_reg_w.read(), self.pc_reg_w.read()))
         self.IFXT_o.write(IFXT_t(self.ir_reg_w.read()))      # output instruction to extractor
-        # self.ext_o.write(self.eb_reg_w.read())               # output entropy
         self.XT_o.write(self.XT_w.read())
 
 
@@ -172,6 +162,7 @@ class IDStage(Module):
 
         # Determine opcode (inst[6:2])
         opcode = getBits(inst, 6, 2)
+        logger.info(f"Current instruction opcode: {self.pc:08X}")
 
         if fi_cycle and curr_cycle == fi_cycle:
             ### Inject fault

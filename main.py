@@ -1,7 +1,8 @@
 import time
 from pyv.isa import IllegalInstructionException
 from pyv.models.model import Model
-from pyv.models.singlecycle import SingleCycleModel
+# from pyv.models.singlecycle import SingleCycleModel
+from pyv.models.singlecycle_entropy import SingleCycleEntropyModel
 from pyv.simulator import Simulator
 
 import matplotlib.pyplot as plt
@@ -19,7 +20,7 @@ def execute_bin(
     # Create core instance
     # print("* Creating core instance...")
     if core_type == 'single':
-        core = SingleCycleModel()
+        core = SingleCycleEntropyModel()
 
     # Load binary into memory
     # print("* Loading binary...")
@@ -94,13 +95,13 @@ def atoi(fi_cycle):
 
 
 def main():
-    cycles = [30, 70]
+    cycles = [30, 31]
     x = np.arange(cycles[0], cycles[1], 1)
     fi_results = []
     res = []
     for i in range (cycles[0], cycles[1]):
         try:
-            res = atoi(i)
+            res = atoi(None)
             if res[0] != "0xc":
                 fi_results.append("Target meet")
                 print("### TARGET MEET ###")
@@ -115,20 +116,20 @@ def main():
             print("### MEMORY INDEX ERROR ###")
         finally:
             Simulator.globalSim.clear()
+    
+    # y = np.array(fi_results)
+    # y_mapping = {'Target meet': 3, 'PC out of bound': 2, 'Other issue': 1, 'No effect': 0}
+    # y_mapped = [y_mapping[val] for val in y]
 
-    y = np.array(fi_results)
-    y_mapping = {'Target meet': 3, 'PC out of bound': 2, 'Other issue': 1, 'No effect': 0}
-    y_mapped = [y_mapping[val] for val in y]
+    # plt.figure(figsize=(10, 6))
+    # plt.scatter(x, y_mapped, c='blue', marker='d')
+    # plt.yticks(list(y_mapping.values()), list(y_mapping.keys()))
+    # plt.xlabel('X-axis')
+    # plt.ylabel('Y-axis')
+    # plt.xticks(np.arange(min(x), max(x)+1, 2.0))
+    # plt.title('atoi')
 
-    plt.figure(figsize=(10, 6))
-    plt.scatter(x, y_mapped, c='blue', marker='d')
-    plt.yticks(list(y_mapping.values()), list(y_mapping.keys()))
-    plt.xlabel('X-axis')
-    plt.ylabel('Y-axis')
-    plt.xticks(np.arange(min(x), max(x)+1, 2.0))
-    plt.title('atoi')
-
-    plt.show()
+    # plt.show()
 
 
 if __name__ == '__main__':

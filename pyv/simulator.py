@@ -150,7 +150,7 @@ class Simulator:
     def _process_changes(self):
         while len(self._change_queue) > 0:
             nextFn = self._change_queue.popleft()
-            logger.info(f"Running {nextFn.__qualname__}")
+            logger.debug(f"Running {nextFn.__qualname__}")
             nextFn()
 
     def _events_pending(self):
@@ -160,7 +160,7 @@ class Simulator:
         while self._events_pending():
             event: Event = self._event_queue.get_next_event()
             callback = event[2]
-            logger.info(f"Triggering event -> {callback.__qualname__}()")
+            logger.debug(f"Triggering event -> {callback.__qualname__}()")
             callback()
 
     def _process_onstable_callbacks(self):
