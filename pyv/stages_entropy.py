@@ -162,7 +162,7 @@ class IDStage(Module):
 
         # Determine opcode (inst[6:2])
         opcode = getBits(inst, 6, 2)
-        logger.info(f"Current instruction opcode: {self.pc:08X}")
+        logger.info(f"Current instruction opcode: {opcode:08X}")
 
         if fi_cycle and curr_cycle == fi_cycle:
             ### Inject fault

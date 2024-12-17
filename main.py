@@ -20,6 +20,7 @@ def execute_bin(
     # Create core instance
     # print("* Creating core instance...")
     if core_type == 'single':
+        # core = SingleCycleModel()
         core = SingleCycleEntropyModel()
 
     # Load binary into memory
@@ -40,7 +41,7 @@ def execute_bin(
     core.run(num_cycles)
     end = time.perf_counter()
 
-    # print(f"Simulation done at cycle {core.getCycles()} after {end-start}s.\n")
+    print(f"Simulation done at cycle {core.getCycles()} after {end-start}s.\n")
 
     return core
 
