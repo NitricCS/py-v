@@ -75,12 +75,12 @@ class IFStage(Module):
 
     Inputs:
         npc_i: Next program counter (PC)
-        eb_i: Input from entropy extractor (entropy bits)
+        XTIF_i: Input from entropy extractor (entropy and signals)
 
     Outputs:
         IFID_o: Interface to IDStage
         IFXT_o: Interface to entropy extractor (instruction)
-        ext_o: Entropy bits output
+        XT_o: Output of entropy data and signals
     """
 
     def __init__(self, imem: ReadPort):
