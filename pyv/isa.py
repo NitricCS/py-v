@@ -14,8 +14,7 @@ OPCODES = {
     "BRANCH": 0x18,
     "JALR": 0x19,
     "JAL": 0x1B,
-    "SYSTEM": 0x1C,
-    "NOP": 0x04
+    "SYSTEM": 0x1C
 }
 
 # --------------------------------
