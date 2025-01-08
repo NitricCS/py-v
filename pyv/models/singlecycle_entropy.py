@@ -61,6 +61,8 @@ class SingleCycleEntropy(Module):
         # Integrate entropy extractor
         self.extractor.IFXT_i << self.if_stg.IFXT_o
         self.if_stg.XTIF_i << self.extractor.XTIF_o
+        self.extractor.TXT_i << self.mem_stg.TXT_o
+        self.mem_stg.XT_i << self.extractor.XTIF_o
 
         # Connect WBStage to CSR unit
         self.csr_unit.write_en_i << self.wb_stg.csr_write_en_o

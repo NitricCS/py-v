@@ -3,11 +3,12 @@ import pytest
 from tabulate import tabulate
 from pyv.csr import CSRUnit
 from pyv.simulator import Simulator
-from pyv.extractor import Extractor
+from pyv.extractor import Extractor, XTIF_t
 from pyv.stages_entropy import IFStage, IDStage, EXStage, MEMStage, WBStage, BranchUnit, IFID_t, IDEX_t, EXMEM_t, MEMWB_t
 from pyv.reg import Regfile
 from pyv.util import MASK_32
 from pyv.mem import Memory
+from pyv.port import Wire
 
 
 def test_sanity():
@@ -64,7 +65,7 @@ class TestIFStage:
         return fetch
 
     @pytest.mark.extraction
-    @pytest.mark.regression
+    @pytest.mark.skip(reason="No longer a valid regression test after activating pipeline blocking")
     def test_IFStage(self, sim, imem, fetch):
         # SW a0,-20(s0) = SW, x10, -20(x8)
         # 0xfea42623
@@ -72,6 +73,23 @@ class TestIFStage:
 
         fetch.npc_i.write(0x00000000)
         sim.step()
+
+        out = fetch.IFID_o.read()
+        assert out.inst == 0xfea42623
+        assert out.pc == 0x00000000
+    
+    @pytest.mark.extraction
+    @pytest.mark.regression
+    def test_IFStage_regression(self, sim, imem, fetch):
+        # SW a0,-20(s0) = SW, x10, -20(x8)
+        # 0xfea42623
+        imem.mem[0:4] = [0x23, 0x26, 0xa4, 0xfe]
+
+        fetch.npc_i.write(0x00000000)
+        fetch.XTIF_i.write(XTIF_t(entropy=[], active=False, ready=True, flush_bits=False))
+        sim.step()
+        fetch.XTIF_i.write(XTIF_t(entropy=[], active=False, ready=False, flush_bits=False))
+        sim.step()        
 
         out = fetch.IFID_o.read()
         assert out.inst == 0xfea42623
@@ -156,6 +174,59 @@ class TestIFStage:
         assert len(out_xt.entropy) == 16
         assert out_xt.entropy == [61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60]
         assert out_xt.flush_bits
+    
+    @pytest.mark.extraction
+    def test_XT_pipeline_blocking(self, sim, extractor, fetch, imem):
+        extractor.IFXT_i << fetch.IFXT_o
+        fetch.XTIF_i << extractor.XTIF_o
+
+        # initialize instruction memory
+        imem.mem[0:4] = [0x33, 0x26, 0xa4, 0xfa]
+        imem.mem[4:8] = [0x33, 0x26, 0xa4, 0xfe]
+        imem.mem[8:12] = [0xff, 0xff, 0xff, 0xff]
+        pc = 0x00000000
+
+        fetch.npc_i.write(pc)     # send PC to fetch
+        sim.step()                # run a cycle
+        if_out = fetch.IFXT_o.read()
+        assert if_out.inst == 0xfaa42633       # correct instruction out of fetch
+        ifid_out = fetch.IFID_o.read()
+        assert ifid_out.inst == 0x00000013       # correct instruction to next stages
+
+        pc += 16
+        fetch.npc_i.write(pc)     # send PC to fetch
+        sim.step()                # run a cycle to out_pc == 4
+        if_out = fetch.IFXT_o.read()
+        assert if_out.inst == 0xfea42633       # correct instruction out of fetch
+        ifid_out = fetch.IFID_o.read()
+        assert ifid_out.inst == 0x00000013       # correct instruction to next stages
+
+        sim.step()                # run to out_pc == 8
+        if_out = fetch.IFXT_o.read()
+        assert if_out.inst == 0xffffffff       # STOP instruction out of fetch
+        out_xt = fetch.XT_o.read()
+        assert out_xt.ready
+        assert not out_xt.active
+        ifid_out = fetch.IFID_o.read()
+        assert ifid_out.inst == 0x00000013       # correct instruction to next stages
+
+        sim.step()                # run to out_pc == 12
+        fetch_out = fetch.IFID_o.read()
+        out_pc = fetch_out.pc
+        assert out_pc == 12        # verify PC is not taken from input
+        ifid_out = fetch.IFID_o.read()
+        assert ifid_out.inst == 0       # correct instruction to next stages
+
+        pc = 16
+        sim.step()
+        fetch.npc_i.write(pc)     # send PC to fetch
+        sim.step()
+        fetch_out = fetch.IFID_o.read()
+        out_pc = fetch_out.pc
+        assert out_pc == 16        # verify PC comes from input
+        ifid_out = fetch.IFID_o.read()
+        assert ifid_out.inst == 0xfaa42633       # correct instruction to next stages
+
 
 # ---------------------------------------
 # Test DECODE
@@ -1916,6 +1987,81 @@ class TestMEMStage:
         ))
         sim.step()
         assert mem.mem[0:4] == [0xbe, 0xba, 0xad, 0xab]
+    
+    @pytest.mark.extraction
+    def test_store_entropy(self, mem_stage, mem, sim):
+        mem_stage._init()
+        mem_stage.XT_i.write(XTIF_t(entropy=[61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60], active=True, ready=False, flush_bits=True))
+
+        # state == 0 -> 1
+        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=0, rs2=0xabadbabe, funct3=1))
+        sim.step()
+        assert mem.mem[64:68] == [0xf7, 0x7c, 0xcf, 0xf7]
+        assert not mem_stage.TXT_o.read().flush_bits_ready
+
+        # state == 1 -> 2
+        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=1, rs2=0xabadbabe, funct3=1))
+        sim.step()
+        assert mem.mem[68:72] == [0xcf, 0xf7, 0x7c, 0xcf]
+
+        # state == 2 -> 0
+        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=3, rs2=0xabadbabe, funct3=1))
+        sim.step()
+        assert mem_stage.flush_state.next.read() == 0        # verify state reset
+        assert mem.mem[72:76] == [0x7c, 0xcf, 0xf7, 0x7c]    # verify last chunk is dumped
+        assert mem_stage.flush_ready.next.read()
+        assert not mem_stage.TXT_o.read().flush_bits_ready
+
+        # one more step after full flush
+        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=5, rs2=0xabadbabe, funct3=1))
+        sim.step()
+        assert mem_stage.TXT_o.read().flush_bits_ready       # verify flush ready out
+
+        # one more step after flush signal is down
+        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=4, rs2=0xabadbabe, funct3=1))
+        mem_stage.XT_i.write(XTIF_t(entropy=[], active=True, ready=False, flush_bits=False))
+        sim.step()
+        assert mem_stage.flush_state.next.read() == 0        # verify state reset
+        assert not mem_stage.TXT_o.read().flush_bits_ready       # verify flush ready out is down
+
+    @pytest.mark.extraction
+    def test_entropy_integr(self, mem_stage, mem, sim):
+        mem_stage._init()
+        regf = Regfile()
+        csr = CSRUnit()
+        extractor = Extractor(regf, csr)
+        extractor._init()
+
+        extractor.TXT_i << mem_stage.TXT_o
+        mem_stage.XT_i << extractor.XTIF_o
+
+        extractor.flush_bits = True
+        extractor.eb_reg.cur.write([61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60])
+        extractor.eb_reg.next.write([61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60])
+        extractor.ready_out == False
+        extractor.active_out == True
+
+        # state == 0 -> 1
+        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=0, rs2=0xabadbabe, funct3=1))
+        sim.step()
+        # state == 1 -> 2
+        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=1, rs2=0xabadbabe, funct3=1))
+        sim.step()
+        # state == 2 -> 0
+        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=3, rs2=0xabadbabe, funct3=1))
+        sim.step()
+        # one more step after full flush
+        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=5, rs2=0xabadbabe, funct3=1))
+        sim.step()
+        assert mem_stage.TXT_o.read().flush_bits_ready       # verify flush ready out
+        assert not extractor.XTIF_o.read().flush_bits
+
+        # one more step after flush signal is down
+        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=4, rs2=0xabadbabe, funct3=1))
+        sim.step()
+        # assert mem_stage.flush_state.next.read() == 0        # TODO find a way to verify state reset
+        assert not mem_stage.TXT_o.read().flush_bits_ready       # verify flush ready out is down
+        
 
     def test_exception(self, mem_stage, caplog, sim):
         mem_stage._init()

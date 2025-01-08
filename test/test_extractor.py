@@ -76,6 +76,7 @@ class TestEntropyExtractor():
     
     # flush signal
     @pytest.mark.extraction
+    @pytest.mark.debug
     def test_extractor_flush_signal(self, sim: Simulator, extractor: Extractor):
         extractor.TXT_i.write(TXT_t(False))
         # 16 cycles
@@ -101,3 +102,4 @@ class TestEntropyExtractor():
         # read output and verify
         out: XTIF_t = extractor.XTIF_o.read()
         assert not out.flush_bits
+        assert out.entropy == []

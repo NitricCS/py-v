@@ -4,7 +4,7 @@ from pyv.port import Input, Output, Wire, Constant
 from pyv.reg import Reg, Regfile
 from pyv.mem import ReadPort, WritePort
 from pyv.simulator import Simulator
-from pyv.extractor import IFXT_t, XTIF_t
+from pyv.extractor import IFXT_t, XTIF_t, TXT_t
 import pyv.isa as isa
 from pyv.util import getBit, getBits, MASK_32, XLEN, msb_32, signext
 from pyv.log import logger
@@ -69,6 +69,8 @@ class MEMWB_t:
 LOAD = 1
 STORE = 2
 
+ENTROPY_ADDRESS = 64
+
 
 class IFStage(Module):
     """Instruction Fetch Stage.
@@ -96,6 +98,10 @@ class IFStage(Module):
         self.XT_w = Wire(XTIF_t, [self.writeOutput])
         self.XT_w << self.XTIF_i
 
+        self.npc_w = Wire(int)
+        self.epc_reg = Reg(int, -4)
+        self.npc_w << self.epc_reg.cur
+
         # Program counter (PC)
         self.pc_reg = Reg(int, -4)
 
@@ -104,24 +110,46 @@ class IFStage(Module):
 
         # Helper wires
         self.pc_reg_w = Wire(int, [self.writeOutput])
-        self.ir_reg_w = Wire(int, [self.writeOutput])
+        self.ir_reg_w = Wire(int, [self.writeOutput])    # wire writing to extractor output
         self.pc_reg_w << self.pc_reg.cur
         self.ir_reg_w << self.ir_reg.cur
+        self.ir_out_w = Wire(int, [self.writeOutput])    # wire writing to next stages
 
         # Instruction memory
         # Force read-enable
         self.const1 = Constant(True)
         self.const2 = Constant(4)
         imem.re_i << self.const1
-        imem.addr_i << self.npc_i
+        # imem.addr_i << self.npc_i
+        imem.addr_i << self.npc_w
         imem.width_i << self.const2
         self.ir_reg.next << imem.rdata_o
 
         # Connect next PC to input of PC reg
-        self.pc_reg.next << self.npc_i
+        # self.pc_reg.next << self.npc_i        # connect to a wire that receives either next pc or zero
+        self.pc_reg.next << self.npc_w        # connect to a wire that receives either next pc or zero
+    
+    def process(self):
+        XT = self.XT_w.read()
+        ready = XT.ready
+        active = XT.active
+        if active:
+            self.epc_reg.next.write(self.epc_reg.cur.read() + 4)
+            self.ir_out_w.write(0x00000013)
+            # next_pc = self.pc_reg_w.read() + 4
+            # self.npc_w.write(next_pc)
+        elif ready:
+            # self.npc_w.write(0)
+            self.epc_reg.next.write(0)
+            self.ir_out_w.write(0x00000013)
+        else:
+            # self.npc_w.write(self.npc_i.read())
+            self.epc_reg.next.write(self.npc_i.read())
+            self.ir_out_w.write(self.ir_reg_w.read())
 
     def writeOutput(self):
-        self.IFID_o.write(IFID_t(self.ir_reg_w.read(), self.pc_reg_w.read()))
+        # self.IFID_o.write(IFID_t(self.ir_reg_w.read(), self.pc_reg_w.read()))
+        self.IFID_o.write(IFID_t(self.ir_out_w.read(), self.pc_reg_w.read()))
         self.IFXT_o.write(IFXT_t(self.ir_reg_w.read()))      # output instruction to extractor
         self.XT_o.write(self.XT_w.read())
 
@@ -750,17 +778,28 @@ class MEMStage(Module):
 
     Inputs:
         EXMEM_i: Interface from EXStage.
+        XT_i: Interface from IF (entropy extraction signals)
 
     Outputs:
         MEMWB_o: Interface to WBStage.
+        TXT_o: Output to IF/extractor (flush ready signal)
     """
     def __init__(self, dmem_read: ReadPort, dmem_write: WritePort):
         super().__init__()
         self.EXMEM_i = Input(EXMEM_t)
+        self.XT_i = Input(XTIF_t)
         self.MEMWB_o = Output(MEMWB_t)
         self.load_val = Wire(int, [self.process_load])
+        self.TXT_o = Output(TXT_t)
 
         self.registerStableCallbacks([self.check_exception])
+
+        self.flush_ready = Reg(bool, False)
+        self.flush_ready_w = Wire(bool)
+        self.flush_ready.next << self.flush_ready_w
+        self.flush_state = Reg(int, 0)
+        self.flush_state_w = Wire(int)
+        self.flush_state.next << self.flush_state_w
 
         # Main memory
         self.read_port = dmem_read
@@ -784,6 +823,7 @@ class MEMStage(Module):
             csr_write_en=self.out_val.csr_write_en,
             csr_write_val=self.out_val.csr_write_val
         ))
+        self.TXT_o.write(TXT_t(self.flush_ready.cur.read()))
 
     def process_load(self):
         load_val = self.load_val.read()
@@ -796,19 +836,63 @@ class MEMStage(Module):
     def process(self):
         # Read inputs
         in_val = self.EXMEM_i.read()
+        xt = self.XT_i.read()         # entropy extractor/fetch input
         addr = in_val.alu_res
         mem_wdata = in_val.rs2
         op = in_val.mem
         f3 = in_val.funct3
+        if xt.flush_bits:
+            op = STORE
+            f3 = 2
 
         self.check_exception_inputs = (op, addr, f3)
 
         # Set inputs for memory module
         we = False
         re = False
-        self.read_port.addr_i.write(addr)
-        self.write_port.wdata_i.write(mem_wdata)
+        state = self.flush_state.cur.read()
+        if xt.flush_bits and not self.flush_ready.cur.read():
+            if state == 0:
+                w1 = str(bin(xt.entropy[0]))[2:]
+                w2 = str(bin(xt.entropy[1]))[2:]
+                w3 = str(bin(xt.entropy[2]))[2:]
+                w4 = str(bin(xt.entropy[3]))[2:]
+                w5 = str(bin(xt.entropy[4]))[2:]
+                w6 = str(bin(getBits(xt.entropy[5], 5, 4)))[2:]
+                entropy_addr = ENTROPY_ADDRESS
+                self.flush_state_w.write(state + 1)
+            if state == 1:
+                w1 = str(bin(getBits(xt.entropy[5], 3, 0)))[2:]
+                w2 = str(bin(xt.entropy[6]))[2:]
+                w3 = str(bin(xt.entropy[7]))[2:]
+                w4 = str(bin(xt.entropy[8]))[2:]
+                w5 = str(bin(xt.entropy[9]))[2:]
+                w6 = str(bin(getBits(xt.entropy[10], 5, 2)))[2:]
+                entropy_addr = ENTROPY_ADDRESS + 4
+                self.flush_state_w.write(state + 1)
+            if state == 2:
+                w1 = str(bin(getBits(xt.entropy[10], 1, 0)))[2:]
+                w2 = str(bin(xt.entropy[11]))[2:]
+                w3 = str(bin(xt.entropy[12]))[2:]
+                w4 = str(bin(xt.entropy[13]))[2:]
+                w5 = str(bin(xt.entropy[14]))[2:]
+                w6 = str(bin(xt.entropy[15]))[2:]
+                entropy_addr = ENTROPY_ADDRESS + 8
+                self.flush_state_w.write(0)
+            entropy_write_value = int((w1 + w2 + w3 + w4 + w5 + w6), 2)
+            self.read_port.addr_i.write(entropy_addr)
+            self.write_port.wdata_i.write(entropy_write_value)
+        else:
+            self.read_port.addr_i.write(addr)
+            self.write_port.wdata_i.write(mem_wdata)
         self.signext_w = 0
+
+        if state == 2:
+            self.flush_ready_w.write(True)
+            self.flush_state_w.write(0)
+        
+        if self.flush_ready.cur.read():
+            self.flush_ready_w.write(False)
 
         if op == LOAD:                                          # Read memory
             re = True

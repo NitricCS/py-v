@@ -71,6 +71,8 @@ class Extractor(Module):
         # set ready output
         if self.ready and self.active_out:
             self.ready_out = True
+        else:
+            self.ready_out = False
         
         # set active output
         if self.ready and self.active_out:
@@ -80,8 +82,11 @@ class Extractor(Module):
         funct7 = getBits(inst, 31, 25)
         # Get entropy bits from funct7
         if opcode == isa.OPCODES['OP']:
-            entropy = self.get_entropy_bits(funct7)
-            entropy_list.append(entropy)
+            if flush_ready:
+                entropy_list = []
+            else:
+                entropy = self.get_entropy_bits(funct7)
+                entropy_list.append(entropy)
             self.eb_reg.next.write(entropy_list)
 
         # set flush signal
