@@ -133,8 +133,12 @@ class IFStage(Module):
         XT = self.XT_w.read()
         ready = XT.ready
         active = XT.active
+        flush = XT.flush_bits
         if active:
-            self.epc_reg.next.write(self.epc_reg.cur.read() + 4)
+            if flush:
+                self.epc_reg.next.write(self.epc_reg.cur.read())
+            else:
+                self.epc_reg.next.write(self.epc_reg.cur.read() + 4)
             self.ir_out_w.write(0x00000013)
             # next_pc = self.pc_reg_w.read() + 4
             # self.npc_w.write(next_pc)
@@ -170,6 +174,8 @@ class IDStage(Module):
         self.csr = csr
 
         self.registerStableCallbacks([self.check_exception])
+        self.STOP_INSTR = 0xffffffff
+        self.NOP_INSTR = 0x00000013
 
         # Inputs
         self.IFID_i = Input(IFID_t)
@@ -187,6 +193,10 @@ class IDStage(Module):
 
         curr_cycle = Simulator.globalSim.getCycles() - 1
         fi_cycle = Simulator.globalSim.getFICycle()
+
+        # entropy extraction stop instruction replacement
+        if inst == self.STOP_INSTR:
+            inst = self.NOP_INSTR
 
         # Determine opcode (inst[6:2])
         opcode = getBits(inst, 6, 2)
@@ -837,13 +847,16 @@ class MEMStage(Module):
         # Read inputs
         in_val = self.EXMEM_i.read()
         xt = self.XT_i.read()         # entropy extractor/fetch input
-        addr = in_val.alu_res
-        mem_wdata = in_val.rs2
-        op = in_val.mem
-        f3 = in_val.funct3
         if xt.flush_bits:
             op = STORE
             f3 = 2
+            addr = ENTROPY_ADDRESS
+            mem_wdata = 0
+        else:
+            addr = in_val.alu_res
+            mem_wdata = in_val.rs2
+            op = in_val.mem
+            f3 = in_val.funct3
 
         self.check_exception_inputs = (op, addr, f3)
 

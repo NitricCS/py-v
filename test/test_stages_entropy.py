@@ -2025,6 +2025,7 @@ class TestMEMStage:
         assert not mem_stage.TXT_o.read().flush_bits_ready       # verify flush ready out is down
 
     @pytest.mark.extraction
+    # @pytest.mark.current
     def test_entropy_integr(self, mem_stage, mem, sim):
         mem_stage._init()
         regf = Regfile()
@@ -2061,7 +2062,41 @@ class TestMEMStage:
         sim.step()
         # assert mem_stage.flush_state.next.read() == 0        # TODO find a way to verify state reset
         assert not mem_stage.TXT_o.read().flush_bits_ready       # verify flush ready out is down
+    
+    # @pytest.mark.extraction
+    @pytest.mark.current
+    def test_entropy_full_integr(self, mem_stage, mem, sim):
+        mem_stage._init()
+        regf = Regfile()
+        csr = CSRUnit()
         
+        extractor = Extractor(regf, csr)
+        extractor._init()
+        
+        imem = Memory(1024)
+        imem._init()
+        fetch = IFStage(imem.read_port1)
+        fetch._init()
+
+        extractor.IFXT_i << fetch.IFXT_o
+        fetch.XTIF_i << extractor.XTIF_o
+        extractor.TXT_i << mem_stage.TXT_o
+        mem_stage.XT_i << extractor.XTIF_o
+
+        # initialize instruction memory
+        for i in range(0, 80, 8):
+            imem.mem[i:i+4] = [0x33, 0x26, 0xa4, 0xfa]
+            imem.mem[i+4:i+8] = [0x33, 0x26, 0xa4, 0xf8]
+        imem.mem[84:88] = [0xff, 0xff, 0xff, 0xff]
+        pc = 0x00000000
+
+        for _ in range(0, 22):
+            sim.step()
+            print("Instruction fetched: ", hex(fetch.IFXT_o.read().inst))
+            print("Instruction forwarded: ", hex(fetch.IFID_o.read().inst))
+            print("Extractor state: ", extractor.XTIF_o.read())
+            print("Memory boxes: ", mem.mem[64:68], mem.mem[68:72], mem.mem[72:76])
+
 
     def test_exception(self, mem_stage, caplog, sim):
         mem_stage._init()
