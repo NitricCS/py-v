@@ -1,11 +1,8 @@
-from pyv.csr import CSRUnit
 from pyv.module import Module
-from pyv.port import Input, Output, Wire, Constant
-from pyv.reg import Reg, Regfile
-from pyv.mem import ReadPort, WritePort
-from pyv.simulator import Simulator
+from pyv.port import Input, Output, Wire
+from pyv.reg import Reg
 import pyv.isa as isa
-from pyv.util import getBit, getBits, MASK_32, XLEN, msb_32, signext
+from pyv.util import getBit, getBits
 from pyv.log import logger
 from dataclasses import dataclass, field
 
@@ -37,10 +34,8 @@ class Extractor(Module):
         XTIF_t: Interface to IFStage (entropy, active, ready, flush)
     """
 
-    def __init__(self, regf: Regfile, csr: CSRUnit):
+    def __init__(self):
         super().__init__()
-        self.regfile = regf
-        self.csr = csr
         self.ready = False
         self.ready_out = False
         self.active_out = True
@@ -53,7 +48,6 @@ class Extractor(Module):
         self.IFXT_i = Input(IFXT_t)     # fetch module in: instruction
         self.TXT_i = Input(TXT_t)       # top in
         self.XTIF_o = Output(XTIF_t)    # entropy and signals out
-        # self.eb_o = Output(list)        # entropy bits out
     
     def process(self):
         top_val: TXT_t = self.TXT_i.read()
@@ -84,7 +78,7 @@ class Extractor(Module):
         if opcode == isa.OPCODES['OP']:
             if flush_ready:
                 entropy_list = []
-            else:
+            elif self.active_out and not self.flush_bits:
                 entropy = self.get_entropy_bits(funct7)
                 entropy_list.append(entropy)
             self.eb_reg.next.write(entropy_list)

@@ -52,9 +52,7 @@ class TestIFStage:
 
     @pytest.fixture(scope='function')
     def extractor(self):
-        regf = Regfile()
-        csr = CSRUnit()
-        extractor = Extractor(regf, csr)
+        extractor = Extractor()
         extractor._init()
         return extractor
     
@@ -1994,43 +1992,50 @@ class TestMEMStage:
         mem_stage.XT_i.write(XTIF_t(entropy=[61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60], active=True, ready=False, flush_bits=True))
 
         # state == 0 -> 1
-        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=0, rs2=0xabadbabe, funct3=1))
         sim.step()
         assert mem.mem[64:68] == [0xf7, 0x7c, 0xcf, 0xf7]
         assert not mem_stage.TXT_o.read().flush_bits_ready
 
         # state == 1 -> 2
-        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=1, rs2=0xabadbabe, funct3=1))
         sim.step()
         assert mem.mem[68:72] == [0xcf, 0xf7, 0x7c, 0xcf]
 
         # state == 2 -> 0
-        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=3, rs2=0xabadbabe, funct3=1))
         sim.step()
         assert mem_stage.flush_state.next.read() == 0        # verify state reset
         assert mem.mem[72:76] == [0x7c, 0xcf, 0xf7, 0x7c]    # verify last chunk is dumped
-        assert mem_stage.flush_ready.next.read()
-        assert not mem_stage.TXT_o.read().flush_bits_ready
+        assert mem_stage.flush_ready.cur.read()
+        assert mem_stage.TXT_o.read().flush_bits_ready
 
         # one more step after full flush
-        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=5, rs2=0xabadbabe, funct3=1))
         sim.step()
-        assert mem_stage.TXT_o.read().flush_bits_ready       # verify flush ready out
+        assert mem_stage.TXT_o.read().flush_bits_ready       # verify flush ready out is back down
 
         # one more step after flush signal is down
-        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=4, rs2=0xabadbabe, funct3=1))
         mem_stage.XT_i.write(XTIF_t(entropy=[], active=True, ready=False, flush_bits=False))
         sim.step()
         assert mem_stage.flush_state.next.read() == 0        # verify state reset
         assert not mem_stage.TXT_o.read().flush_bits_ready       # verify flush ready out is down
 
     @pytest.mark.extraction
-    # @pytest.mark.current
-    def test_entropy_integr(self, mem_stage, mem, sim):
+    def test_store_entropy_not_full(self, mem_stage, mem, sim):
         mem_stage._init()
-        regf = Regfile()
-        csr = CSRUnit()
-        extractor = Extractor(regf, csr)
+        mem_stage.XT_i.write(XTIF_t(entropy=[61, 60, 61, 60], active=False, ready=True, flush_bits=True))
+        # state == 0 -> 1
+        sim.step()
+        assert mem.mem[64:68] == [0xf0, 0x3d, 0xdf, 0x03]
+        # state == 1 -> 2
+        sim.step()
+        assert mem.mem[68:72] == [0x00, 0x00, 0x00, 0x00]
+        # state == 2 -> 0
+        sim.step()
+        assert mem.mem[68:72] == [0x00, 0x00, 0x00, 0x00]
+        
+
+    @pytest.mark.extraction
+    def test_entropy_integr(self, mem_stage, sim):
+        mem_stage._init()
+        extractor = Extractor()
         extractor._init()
 
         extractor.TXT_i << mem_stage.TXT_o
@@ -2043,16 +2048,12 @@ class TestMEMStage:
         extractor.active_out == True
 
         # state == 0 -> 1
-        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=0, rs2=0xabadbabe, funct3=1))
         sim.step()
         # state == 1 -> 2
-        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=1, rs2=0xabadbabe, funct3=1))
         sim.step()
         # state == 2 -> 0
-        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=3, rs2=0xabadbabe, funct3=1))
         sim.step()
         # one more step after full flush
-        mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=5, rs2=0xabadbabe, funct3=1))
         sim.step()
         assert mem_stage.TXT_o.read().flush_bits_ready       # verify flush ready out
         assert not extractor.XTIF_o.read().flush_bits
@@ -2063,14 +2064,12 @@ class TestMEMStage:
         # assert mem_stage.flush_state.next.read() == 0        # TODO find a way to verify state reset
         assert not mem_stage.TXT_o.read().flush_bits_ready       # verify flush ready out is down
     
-    # @pytest.mark.extraction
-    @pytest.mark.current
+    @pytest.mark.extraction
+    @pytest.mark.visual
     def test_entropy_full_integr(self, mem_stage, mem, sim):
         mem_stage._init()
-        regf = Regfile()
-        csr = CSRUnit()
         
-        extractor = Extractor(regf, csr)
+        extractor = Extractor()
         extractor._init()
         
         imem = Memory(1024)
@@ -2090,13 +2089,32 @@ class TestMEMStage:
         imem.mem[84:88] = [0xff, 0xff, 0xff, 0xff]
         pc = 0x00000000
 
-        for _ in range(0, 22):
+        print("\n\nInitialized")
+        print("Instruction fetched:", hex(fetch.IFXT_o.read().inst))
+        print("Instruction forwarded:", hex(fetch.IFID_o.read().inst))
+        print("Extractor output state:", extractor.XTIF_o.read())
+        
+        for i in range(0, 33):
             sim.step()
-            print("Instruction fetched: ", hex(fetch.IFXT_o.read().inst))
-            print("Instruction forwarded: ", hex(fetch.IFID_o.read().inst))
-            print("Extractor state: ", extractor.XTIF_o.read())
-            print("Memory boxes: ", mem.mem[64:68], mem.mem[68:72], mem.mem[72:76])
-
+            print("\nCycle", i)
+            print("Instruction fetched:", hex(fetch.IFXT_o.read().inst))
+            print("Instruction forwarded:", hex(fetch.IFID_o.read().inst))
+            print("Extractor output state:", extractor.XTIF_o.read())
+            print("Memory boxes:",
+                  mem.mem[64:68],
+                  mem.mem[68:72],
+                  mem.mem[72:76],
+                  mem.mem[76:80],
+                  mem.mem[80:84],
+                  mem.mem[84:88])
+        
+        assert mem.mem[64:88] == [0xf7, 0x7c, 0xcf, 0xf7,
+                                  0xcf, 0xf7, 0x7c, 0xcf,
+                                  0x7c, 0xcf, 0xf7, 0x7c,
+                                  0xf0, 0x3d, 0xdf, 0x03,
+                                  0, 0, 0, 0,
+                                  0, 0, 0, 0]
+        assert fetch.IFXT_o.read().inst == 0xfaa42633
 
     def test_exception(self, mem_stage, caplog, sim):
         mem_stage._init()

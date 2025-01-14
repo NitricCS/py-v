@@ -1,14 +1,10 @@
 import pytest
 from pyv.simulator import Simulator
-from pyv.csr import CSRUnit
-from pyv.reg import Regfile
 from pyv.extractor import Extractor, IFXT_t, XTIF_t, TXT_t
 
 @pytest.fixture(scope="function")
 def extractor():
-    regf = Regfile()
-    csr = CSRUnit()
-    extractor = Extractor(regf, csr)
+    extractor = Extractor()
     extractor._init()
     return extractor
 
@@ -22,7 +18,6 @@ class TestEntropyExtractor():
 
         # read output and verify
         out: XTIF_t = extractor.XTIF_o.read()
-        # eb_out = extractor.eb_o.read()
         assert out.entropy == [61]
         assert not out.ready
         assert out.active

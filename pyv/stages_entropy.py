@@ -807,9 +807,11 @@ class MEMStage(Module):
         self.flush_ready = Reg(bool, False)
         self.flush_ready_w = Wire(bool)
         self.flush_ready.next << self.flush_ready_w
-        self.flush_state = Reg(int, 0)
+        self.flush_state = Reg(int, 0, sensitive_methods=[self.process])
         self.flush_state_w = Wire(int)
         self.flush_state.next << self.flush_state_w
+
+        self.entropy_offset = Reg(int, 0)
 
         # Main memory
         self.read_port = dmem_read
@@ -852,6 +854,9 @@ class MEMStage(Module):
             f3 = 2
             addr = ENTROPY_ADDRESS
             mem_wdata = 0
+            if len(xt.entropy) < 16:
+                for _ in range(len(xt.entropy)+1, 17):
+                    xt.entropy.append(0)
         else:
             addr = in_val.alu_res
             mem_wdata = in_val.rs2
@@ -865,34 +870,10 @@ class MEMStage(Module):
         re = False
         state = self.flush_state.cur.read()
         if xt.flush_bits and not self.flush_ready.cur.read():
-            if state == 0:
-                w1 = str(bin(xt.entropy[0]))[2:]
-                w2 = str(bin(xt.entropy[1]))[2:]
-                w3 = str(bin(xt.entropy[2]))[2:]
-                w4 = str(bin(xt.entropy[3]))[2:]
-                w5 = str(bin(xt.entropy[4]))[2:]
-                w6 = str(bin(getBits(xt.entropy[5], 5, 4)))[2:]
-                entropy_addr = ENTROPY_ADDRESS
-                self.flush_state_w.write(state + 1)
-            if state == 1:
-                w1 = str(bin(getBits(xt.entropy[5], 3, 0)))[2:]
-                w2 = str(bin(xt.entropy[6]))[2:]
-                w3 = str(bin(xt.entropy[7]))[2:]
-                w4 = str(bin(xt.entropy[8]))[2:]
-                w5 = str(bin(xt.entropy[9]))[2:]
-                w6 = str(bin(getBits(xt.entropy[10], 5, 2)))[2:]
-                entropy_addr = ENTROPY_ADDRESS + 4
-                self.flush_state_w.write(state + 1)
-            if state == 2:
-                w1 = str(bin(getBits(xt.entropy[10], 1, 0)))[2:]
-                w2 = str(bin(xt.entropy[11]))[2:]
-                w3 = str(bin(xt.entropy[12]))[2:]
-                w4 = str(bin(xt.entropy[13]))[2:]
-                w5 = str(bin(xt.entropy[14]))[2:]
-                w6 = str(bin(xt.entropy[15]))[2:]
-                entropy_addr = ENTROPY_ADDRESS + 8
-                self.flush_state_w.write(0)
-            entropy_write_value = int((w1 + w2 + w3 + w4 + w5 + w6), 2)
+            entropy_offset = self.entropy_offset.cur.read()
+            entropy_addr = ENTROPY_ADDRESS + entropy_offset
+            entropy_write_value = self.set_entropy_write_value(state, xt)
+            self.entropy_offset.next.write(entropy_offset + 4)
             self.read_port.addr_i.write(entropy_addr)
             self.write_port.wdata_i.write(entropy_write_value)
         else:
@@ -954,6 +935,34 @@ class MEMStage(Module):
         self.out_val.csr_write_en = in_val.csr_write_en
         self.out_val.csr_write_val = in_val.csr_write_val
         self.write_output()
+    
+    def set_entropy_write_value(self, state, xt):
+        if state == 0:
+            w1 = str(bin(xt.entropy[0]))[2:]
+            w2 = str(bin(xt.entropy[1]))[2:]
+            w3 = str(bin(xt.entropy[2]))[2:]
+            w4 = str(bin(xt.entropy[3]))[2:]
+            w5 = str(bin(xt.entropy[4]))[2:]
+            w6 = str(bin(getBits(xt.entropy[5], 5, 4)))[2:]
+            self.flush_state_w.write(state + 1)
+        if state == 1:
+            w1 = str(bin(getBits(xt.entropy[5], 3, 0)))[2:]
+            w2 = str(bin(xt.entropy[6]))[2:]
+            w3 = str(bin(xt.entropy[7]))[2:]
+            w4 = str(bin(xt.entropy[8]))[2:]
+            w5 = str(bin(xt.entropy[9]))[2:]
+            w6 = str(bin(getBits(xt.entropy[10], 5, 2)))[2:]
+            self.flush_state_w.write(state + 1)
+        if state == 2:
+            w1 = str(bin(getBits(xt.entropy[10], 1, 0)))[2:]
+            w2 = str(bin(xt.entropy[11]))[2:]
+            w3 = str(bin(xt.entropy[12]))[2:]
+            w4 = str(bin(xt.entropy[13]))[2:]
+            w5 = str(bin(xt.entropy[14]))[2:]
+            w6 = str(bin(xt.entropy[15]))[2:]
+            self.flush_state_w.write(0)
+        return int((w1 + w2 + w3 + w4 + w5 + w6), 2)
+
 
     def check_exception(self):
         op, addr, f3 = self.check_exception_inputs
