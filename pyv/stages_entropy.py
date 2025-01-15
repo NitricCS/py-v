@@ -120,13 +120,11 @@ class IFStage(Module):
         self.const1 = Constant(True)
         self.const2 = Constant(4)
         imem.re_i << self.const1
-        # imem.addr_i << self.npc_i
         imem.addr_i << self.npc_w
         imem.width_i << self.const2
         self.ir_reg.next << imem.rdata_o
 
         # Connect next PC to input of PC reg
-        # self.pc_reg.next << self.npc_i        # connect to a wire that receives either next pc or zero
         self.pc_reg.next << self.npc_w        # connect to a wire that receives either next pc or zero
     
     def process(self):
@@ -134,25 +132,25 @@ class IFStage(Module):
         ready = XT.ready
         active = XT.active
         flush = XT.flush_bits
+        
+        # split the PC
         if active:
             if flush:
                 self.epc_reg.next.write(self.epc_reg.cur.read())
             else:
                 self.epc_reg.next.write(self.epc_reg.cur.read() + 4)
-            self.ir_out_w.write(0x00000013)
-            # next_pc = self.pc_reg_w.read() + 4
-            # self.npc_w.write(next_pc)
         elif ready:
-            # self.npc_w.write(0)
             self.epc_reg.next.write(0)
+        else:
+            self.epc_reg.next.write(self.npc_i.read())
+        
+        # split the instruction
+        if active or flush or ready:
             self.ir_out_w.write(0x00000013)
         else:
-            # self.npc_w.write(self.npc_i.read())
-            self.epc_reg.next.write(self.npc_i.read())
             self.ir_out_w.write(self.ir_reg_w.read())
 
     def writeOutput(self):
-        # self.IFID_o.write(IFID_t(self.ir_reg_w.read(), self.pc_reg_w.read()))
         self.IFID_o.write(IFID_t(self.ir_out_w.read(), self.pc_reg_w.read()))
         self.IFXT_o.write(IFXT_t(self.ir_reg_w.read()))      # output instruction to extractor
         self.XT_o.write(self.XT_w.read())
