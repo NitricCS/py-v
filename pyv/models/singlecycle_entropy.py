@@ -35,7 +35,7 @@ class SingleCycleEntropy(Module):
         """Write-back"""
         self.bu = BranchUnit()
         """Branch unit"""
-        self.extractor = Extractor(self.regf, self.csr_unit)
+        self.extractor = Extractor()
         """Entropy extractor module"""
 
         # Wires
