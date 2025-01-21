@@ -3,7 +3,7 @@ import pytest
 from tabulate import tabulate
 from pyv.csr import CSRUnit
 from pyv.simulator import Simulator
-from pyv.extractor import Extractor, XTIF_t
+from pyv.extractor import Extractor, XTIF_t, TXT_t
 from pyv.stages_entropy import IFStage, IDStage, EXStage, MEMStage, WBStage, BranchUnit, IFID_t, IDEX_t, EXMEM_t, MEMWB_t
 from pyv.reg import Regfile
 from pyv.util import MASK_32
@@ -174,6 +174,7 @@ class TestIFStage:
         assert out_xt.flush_bits
     
     @pytest.mark.extraction
+    @pytest.mark.debug
     def test_XT_pipeline_blocking(self, sim, extractor, fetch, imem):
         extractor.IFXT_i << fetch.IFXT_o
         fetch.XTIF_i << extractor.XTIF_o
@@ -184,46 +185,48 @@ class TestIFStage:
         imem.mem[8:12] = [0xff, 0xff, 0xff, 0xff]
         pc = 0x00000000
 
-        fetch.npc_i.write(pc)     # send PC to fetch
-        sim.step()                # run a cycle
+        fetch.npc_i.write(pc)                    # send PC to fetch
+        sim.step()                               # run a cycle
         if_out = fetch.IFXT_o.read()
-        assert if_out.inst == 0xfaa42633       # correct instruction out of fetch
+        assert if_out.inst == 0xfaa42633         # verify correct instruction out of fetch
         ifid_out = fetch.IFID_o.read()
         assert ifid_out.inst == 0x00000013       # correct instruction to next stages
 
-        pc += 16
-        fetch.npc_i.write(pc)     # send PC to fetch
-        sim.step()                # run a cycle to out_pc == 4
+        pc += 16        # dummy PC value to fuzz in the next steps
+        
+        fetch.npc_i.write(pc)                    # send PC to fetch
+        sim.step()                               # run a cycle to out_pc == 4
         if_out = fetch.IFXT_o.read()
-        assert if_out.inst == 0xfea42633       # correct instruction out of fetch
+        assert if_out.inst == 0xfea42633         # verify correct instruction out of fetch
         ifid_out = fetch.IFID_o.read()
         assert ifid_out.inst == 0x00000013       # correct instruction to next stages
+        assert ifid_out.pc == 4                  # verify correct PC
 
-        sim.step()                # run to out_pc == 8
+        fetch.npc_i.write(pc)                    # send PC to fetch
+        sim.step()                               # run to out_pc == 8
         if_out = fetch.IFXT_o.read()
-        assert if_out.inst == 0xffffffff       # STOP instruction out of fetch
+        assert if_out.inst == 0xffffffff         # verify STOP instruction out of fetch
+        ifid_out = fetch.IFID_o.read()
+        assert ifid_out.inst == 0x00000013       # correct instruction to next stages
+        assert ifid_out.pc == 8                  # verify correct PC
         out_xt = fetch.XT_o.read()
-        assert out_xt.ready
-        assert not out_xt.active
-        ifid_out = fetch.IFID_o.read()
-        assert ifid_out.inst == 0x00000013       # correct instruction to next stages
+        assert out_xt.ready                      # verify ready set by extractor
+        assert not out_xt.active                 # verify active lowered by extractor
 
-        sim.step()                # run to out_pc == 12
-        fetch_out = fetch.IFID_o.read()
-        out_pc = fetch_out.pc
-        assert out_pc == 12        # verify PC is not taken from input
+        fetch.npc_i.write(pc)                    # send PC to fetch
+        sim.step()                               # run to out_pc == 12
+        if_out = fetch.IFXT_o.read()
+        assert if_out.inst == 0x000000000        # verify STOP instruction out of fetch
         ifid_out = fetch.IFID_o.read()
-        assert ifid_out.inst == 0       # correct instruction to next stages
+        assert ifid_out.pc == 12                 # verify PC is not taken from input
+        assert ifid_out.inst == 0x00000013       # verify correct instruction to next stages
 
-        pc = 16
+        fetch.npc_i.write(pc)                    # send PC to fetch
+        extractor.TXT_i.write(TXT_t(flush_bits_ready=True))       # set flush ready signal artificially
         sim.step()
-        fetch.npc_i.write(pc)     # send PC to fetch
-        sim.step()
-        fetch_out = fetch.IFID_o.read()
-        out_pc = fetch_out.pc
-        assert out_pc == 16        # verify PC comes from input
         ifid_out = fetch.IFID_o.read()
-        assert ifid_out.inst == 0xfaa42633       # correct instruction to next stages
+        assert ifid_out.pc == 0                  # verify PC reset
+        assert ifid_out.inst == 0xfaa42633       # verify correct instruction out of fetch
 
 
 # ---------------------------------------
