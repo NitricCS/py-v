@@ -174,7 +174,6 @@ class TestIFStage:
         assert out_xt.flush_bits
     
     @pytest.mark.extraction
-    @pytest.mark.debug
     def test_XT_pipeline_blocking(self, sim, extractor, fetch, imem):
         extractor.IFXT_i << fetch.IFXT_o
         fetch.XTIF_i << extractor.XTIF_o
@@ -2033,7 +2032,6 @@ class TestMEMStage:
         # state == 2 -> 0
         sim.step()
         assert mem.mem[68:72] == [0x00, 0x00, 0x00, 0x00]
-        
 
     @pytest.mark.extraction
     def test_entropy_integr(self, mem_stage, sim):
@@ -2052,20 +2050,24 @@ class TestMEMStage:
 
         # state == 0 -> 1
         sim.step()
+        assert mem_stage.flush_state.cur.read() == 1
+        assert not extractor.XTIF_o.read().ready
+
         # state == 1 -> 2
         sim.step()
-        # state == 2 -> 0
+        assert mem_stage.flush_state.cur.read() == 2
+
+        # # state == 2 -> 0
         sim.step()
-        # one more step after full flush
-        sim.step()
+        assert mem_stage.flush_state.cur.read() == 0
         assert mem_stage.TXT_o.read().flush_bits_ready       # verify flush ready out
-        assert not extractor.XTIF_o.read().flush_bits
+        assert not extractor.XTIF_o.read().flush_bits        # verify flush signal is down
 
         # one more step after flush signal is down
         mem_stage.EXMEM_i.write(EXMEM_t(mem=1, alu_res=4, rs2=0xabadbabe, funct3=1))
         sim.step()
-        # assert mem_stage.flush_state.next.read() == 0        # TODO find a way to verify state reset
-        assert not mem_stage.TXT_o.read().flush_bits_ready       # verify flush ready out is down
+        assert mem_stage.flush_state.cur.read() == 0         # verify state reset
+        assert not mem_stage.TXT_o.read().flush_bits_ready   # verify flush ready out is down
     
     @pytest.mark.extraction
     @pytest.mark.visual
