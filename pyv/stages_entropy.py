@@ -69,7 +69,7 @@ class MEMWB_t:
 LOAD = 1
 STORE = 2
 
-ENTROPY_ADDRESS = 64
+ENTROPY_ADDRESS = 1024
 
 
 class IFStage(Module):
@@ -100,7 +100,7 @@ class IFStage(Module):
 
         self.npc_w = Wire(int)
         self.epc_reg = Reg(int, -4)
-        self.npc_w << self.epc_reg.cur
+        self.npc_w << self.epc_reg.next
 
         # Program counter (PC)
         self.pc_reg = Reg(int, -4)
@@ -115,6 +115,8 @@ class IFStage(Module):
         self.ir_reg_w << self.ir_reg.cur
         self.ir_out_w = Wire(int, [self.writeOutput])    # wire writing to next stages
 
+        self.ir_out_reg = Reg(int, 0x00000013, [self.writeOutput])    # reg writing to next stages
+
         # Instruction memory
         # Force read-enable
         self.const1 = Constant(True)
@@ -125,7 +127,8 @@ class IFStage(Module):
         self.ir_reg.next << imem.rdata_o
 
         # Connect next PC to input of PC reg
-        self.pc_reg.next << self.npc_w        # connect to a wire that receives either next pc or zero
+        # self.pc_reg.next << self.npc_w        # connect to a wire that receives either next pc or zero
+        self.pc_reg.next << self.epc_reg.next        # connect to a wire that receives either next pc or zero
     
     def process(self):
         XT = self.XT_w.read()
@@ -137,21 +140,27 @@ class IFStage(Module):
         if active:
             if flush:
                 self.epc_reg.next.write(self.epc_reg.cur.read())
+            # elif self.epc_reg.next.read() != 0:
             else:
                 self.epc_reg.next.write(self.epc_reg.cur.read() + 4)
         elif ready:
-            self.epc_reg.next.write(0)
-        else:
+            self.epc_reg.next.write(-8)
+        elif not flush:
             self.epc_reg.next.write(self.npc_i.read())
         
         # split the instruction
         if active or flush or ready:
-            self.ir_out_w.write(0x00000013)
+            # self.ir_out_w.write(0x00000013)
+            self.ir_out_reg.next.write(0x00000013)
+        elif self.epc_reg.cur.read()<=-4:
+            self.ir_out_reg.cur.write(0x00000013)
         else:
-            self.ir_out_w.write(self.ir_reg_w.read())
+            # self.ir_out_w.write(self.ir_reg_w.read())
+            self.ir_out_reg.cur.write(self.ir_reg_w.read())
 
     def writeOutput(self):
-        self.IFID_o.write(IFID_t(self.ir_out_w.read(), self.pc_reg_w.read()))
+        # self.IFID_o.write(IFID_t(self.ir_out_w.read(), self.pc_reg_w.read()))
+        self.IFID_o.write(IFID_t(self.ir_out_reg.cur.read(), self.pc_reg_w.read()))
         self.IFXT_o.write(IFXT_t(self.ir_reg_w.read()))      # output instruction to extractor
         self.XT_o.write(self.XT_w.read())
 
