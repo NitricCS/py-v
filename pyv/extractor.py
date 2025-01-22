@@ -74,14 +74,18 @@ class Extractor(Module):
 
         opcode = getBits(inst, 6, 2)
         funct7 = getBits(inst, 31, 25)
+        
+        if flush_ready:
+            entropy_list = []
+        
         # Get entropy bits from funct7
         if opcode == isa.OPCODES['OP']:
-            if flush_ready:
-                entropy_list = []
-            elif self.active_out and not self.flush_bits:
+            # if flush_ready:
+            #     entropy_list = []
+            if self.active_out and not self.flush_bits and not flush_ready:
                 entropy = self.get_entropy_bits(funct7)
                 entropy_list.append(entropy)
-            self.eb_reg.next.write(entropy_list)
+        self.eb_reg.next.write(entropy_list)
 
         # set flush signal
         if (self.flush_bits or len(entropy_list) == 16 or (self.ready and len(entropy_list) > 0)) and not flush_ready:
