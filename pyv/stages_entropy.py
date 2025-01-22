@@ -806,8 +806,8 @@ class MEMStage(Module):
         self.flush_ready_w = Wire(bool)
         self.flush_ready.next << self.flush_ready_w
         self.flush_state = Reg(int, 0, sensitive_methods=[self.process])
-        self.flush_state_w = Wire(int)
-        self.flush_state.next << self.flush_state_w
+        # self.flush_state_w = Wire(int)
+        # self.flush_state.next << self.flush_state_w
 
         self.entropy_offset = Reg(int, 0)
 
@@ -881,9 +881,9 @@ class MEMStage(Module):
 
         if state == 2:
             self.flush_ready_w.write(True)
-            self.flush_state_w.write(0)
+            # self.flush_state.next.write(0)
         
-        if self.flush_ready.cur.read():
+        if self.flush_ready.cur.read() and state != 2:
             self.flush_ready_w.write(False)
 
         if op == LOAD:                                          # Read memory
@@ -942,7 +942,7 @@ class MEMStage(Module):
             w4 = str(bin(xt.entropy[3]))[2:]
             w5 = str(bin(xt.entropy[4]))[2:]
             w6 = str(bin(getBits(xt.entropy[5], 5, 4)))[2:]
-            self.flush_state_w.write(state + 1)
+            self.flush_state.next.write(state + 1)
         if state == 1:
             w1 = str(bin(getBits(xt.entropy[5], 3, 0)))[2:]
             w2 = str(bin(xt.entropy[6]))[2:]
@@ -950,7 +950,7 @@ class MEMStage(Module):
             w4 = str(bin(xt.entropy[8]))[2:]
             w5 = str(bin(xt.entropy[9]))[2:]
             w6 = str(bin(getBits(xt.entropy[10], 5, 2)))[2:]
-            self.flush_state_w.write(state + 1)
+            self.flush_state.next.write(state + 1)
         if state == 2:
             w1 = str(bin(getBits(xt.entropy[10], 1, 0)))[2:]
             w2 = str(bin(xt.entropy[11]))[2:]
@@ -958,7 +958,7 @@ class MEMStage(Module):
             w4 = str(bin(xt.entropy[13]))[2:]
             w5 = str(bin(xt.entropy[14]))[2:]
             w6 = str(bin(xt.entropy[15]))[2:]
-            self.flush_state_w.write(0)
+            self.flush_state.next.write(0)
         return int((w1 + w2 + w3 + w4 + w5 + w6), 2)
 
 
