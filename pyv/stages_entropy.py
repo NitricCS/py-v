@@ -408,13 +408,13 @@ class IDStage(Module):
                 raise isa.IllegalInstructionException(self.pc, inst)
                 illinst = True
 
-        if opcode == isa.OPCODES['OP']:
-            if not (f7 == 0 or f7 == 0b0100000):
-                raise isa.IllegalInstructionException(self.pc, inst)
-                illinst = True
-            elif f7 == 0b0100000 and not (f3 == 0b000 or f3 == 0b101):
-                raise isa.IllegalInstructionException(self.pc, inst)
-                illinst = True
+        # if opcode == isa.OPCODES['OP']:
+        #     if not (f7 == 0 or f7 == 0b0100000):
+        #         raise isa.IllegalInstructionException(self.pc, inst)
+        #         illinst = True
+        #     elif f7 == 0b0100000 and not (f3 == 0b000 or f3 == 0b101):
+        #         raise isa.IllegalInstructionException(self.pc, inst)
+        #         illinst = True
 
         if opcode == isa.OPCODES['JALR']:
             if f3 != 0:
