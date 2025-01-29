@@ -99,7 +99,7 @@ class IFStage(Module):
         self.XT_w << self.XTIF_i
 
         self.npc_w = Wire(int)
-        self.epc_reg = Reg(int, -4)
+        self.epc_reg = Reg(int, -4, [self.process])
         self.npc_w << self.epc_reg.next
 
         # Program counter (PC)
