@@ -44,6 +44,9 @@ def test_data_types():
 # Test FETCH
 # ---------------------------------------
 class TestIFStage:
+    """Instruction fetch module tests.
+    Tests marked 'extraction' are tests related to entropy extraction modification.
+    """
     @pytest.fixture(scope='function')
     def imem(self):
         imem = Memory(1024)
@@ -80,6 +83,10 @@ class TestIFStage:
     @pytest.mark.extraction
     @pytest.mark.regression
     def test_IFStage_regression(self, sim, imem, fetch):
+        """Fetch module regression test.
+        Inputs: program counter 0, low entropy extraction active signal
+        Verification: instruction value output
+        """
         # SW a0,-20(s0) = SW, x10, -20(x8)
         # 0xfea42623
         imem.mem[0:4] = [0x23, 0x26, 0xa4, 0xfe]
@@ -96,6 +103,16 @@ class TestIFStage:
   
     @pytest.mark.extraction
     def test_IF_XT_integr(self, sim, extractor, fetch, imem):
+        """Fetch integration test with entropy extractor module.
+        Both modules are instantiated and connected.
+        Inputs: program counter 0, instruction memory filled with one instruction
+        Verifications:
+            - instruction value on fetch->extractor output
+            - instruction value on extractor input
+            - entropy value on extractor output
+            - entropy value on fetch input and output
+            - fetch output high active signal, low ready and flush signals
+        """
         extractor.IFXT_i << fetch.IFXT_o
         fetch.XTIF_i << extractor.XTIF_o
 
@@ -123,6 +140,13 @@ class TestIFStage:
     
     @pytest.mark.extraction
     def test_IF_XT_signals(self, sim, extractor, fetch, imem):
+        """Fetch module stop/signal handling test.
+        Fetch and extractor modules are instantiated and connected.
+        Inputs: program counter 0, instruction memory filled with STOP instruction
+        Verifications:
+            - fetch output low active signal
+            - fetch output high ready signal
+        """
         extractor.IFXT_i << fetch.IFXT_o
         fetch.XTIF_i << extractor.XTIF_o
 
@@ -136,6 +160,14 @@ class TestIFStage:
     
     @pytest.mark.extraction
     def test_IF_XT_flow(self, sim, extractor, fetch, imem):
+        """Fetch and extractor consecutive instructions flow test.
+        Both modules are instantiated and connected.
+        Inputs: program counter 0, instruction memory filled with 16 instructions
+        Verifications:
+            - entropy register value and length on fetch output
+            - high entropy flush signal on fetch output
+        The test also generates a log file with fetched instructions and extracted entropy values on each cycle.
+        """
         extractor.IFXT_i << fetch.IFXT_o
         fetch.XTIF_i << extractor.XTIF_o
 
@@ -176,6 +208,18 @@ class TestIFStage:
     
     @pytest.mark.extraction
     def test_XT_pipeline_blocking(self, sim, extractor, fetch, imem):
+        """Fetch pipeline blocking test.
+        Fetch and extractor are instantiated and connected.
+        Inputs:
+            - arbitrary program counter values
+            - instruction memory filled with 3 instructions ending with STOP
+        Verifications:
+            - instruction value on fetch output to other stages
+            - instruction value on fetch->extractor output
+            - program counter values after each cycle
+        This test case verifies that PC isn't affected by input PC until the STOP instruction is reached.
+        It also verifies that stages after fetch get a NOP instruction instead of the actual one until STOP is reached.
+        """
         extractor.IFXT_i << fetch.IFXT_o
         fetch.XTIF_i << extractor.XTIF_o
 
@@ -1850,6 +1894,9 @@ class TestEXStage:
 # Test MEMORY
 # ---------------------------------------
 class TestMEMStage:
+    """Memory stage tests.
+    Tests marked 'extraction' verify entropy extraction-related functionality.
+    """
     @pytest.fixture()
     def mem(self):
         dmem = Memory(2048)
@@ -1992,6 +2039,18 @@ class TestMEMStage:
     
     @pytest.mark.extraction
     def test_store_entropy(self, mem_stage, mem, sim):
+        """Entropy store test.
+        Memory stage is instantiated and given entropy value and signals to run through three cycles.
+        This test case verifies that entropy is written down correctly in three consecutive store operations.
+        Inputs:
+            - entropy register filled with entropy values
+            - high entropy flush signal
+        Verifications:
+            - entropy values stored in memory
+            - flush_ready signal pulse when writing is complete
+            - flush signal lowered after writing
+            - flush state reset (entropy chunk number)
+        """
         mem_stage._init()
         mem_stage.XT_i.write(XTIF_t(entropy=[61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60, 61, 60], active=True, ready=False, flush_bits=True))
 
@@ -2023,6 +2082,14 @@ class TestMEMStage:
 
     @pytest.mark.extraction
     def test_store_entropy_not_full(self, mem_stage, mem, sim):
+        """Incomplete entropy store test.
+        This test case verifies that an incomplete (not filled to the length of 16) entropy register contents are written down correctly.
+        Inputs:
+            - entropy register filled partially with entropy values
+            - high entropy flush signal
+        Verifications:
+            - entropy values stored in memory
+        """
         mem_stage._init()
         mem_stage.XT_i.write(XTIF_t(entropy=[61, 60, 61, 60], active=False, ready=True, flush_bits=True))
         # state == 0 -> 1
@@ -2037,6 +2104,18 @@ class TestMEMStage:
 
     @pytest.mark.extraction
     def test_entropy_integr(self, mem_stage, sim):
+        """Memory stage and entropy extractor test.
+        Memory and extractor are instantiated and connected.
+        This test case verifies that memory receives flush signals from extractor and processes them to write down the entropy.
+        Memory gets input data from extractor rather than manually from the test.
+        Inputs:
+            - extractor entropy register filled with entropy values
+            - extractor signals set to flush
+        Verifications:
+            - flush_ready signal pulse when writing is complete
+            - flush signal lowered after writing
+            - flush state reset (entropy chunk number)
+        """
         mem_stage._init()
         extractor = Extractor()
         extractor._init()
@@ -2072,8 +2151,19 @@ class TestMEMStage:
         assert not mem_stage.TXT_o.read().flush_bits_ready   # verify flush ready out is down
     
     @pytest.mark.extraction
-    @pytest.mark.visual
+    @pytest.mark.visualizing
     def test_entropy_full_integr(self, mem_stage, mem, sim):
+        """Full entropy extraction integration visualizing test.
+        Memory, fetch, and extractor are instantiated and connected.
+        This case verifies that fetch and memory receive the necessary data from outputs and process them until the STOP instruction is reached.
+        Instruction memory is filled with entropy-carrying instructions to fill one complete and one incomplete entropy register.
+        
+        Input: instruction memory filled with instructions ending with STOP
+        Verifications:
+            - entropy values in memory
+        
+        This test provides terminal output to observe module functioning via inputs and outputs. Run it with pytest -s option to see the terminal output.
+        """
         mem_stage._init()
         
         extractor = Extractor()

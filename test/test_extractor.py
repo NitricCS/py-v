@@ -9,9 +9,19 @@ def extractor():
     return extractor
 
 class TestEntropyExtractor():
-    # initialization and base functionality
+    '''Entropy extractor module tests.
+    Use an extractor fixture to verify entropy and signal outputs with given instruction inputs.
+    Every test uses a newly instantiated extractor module.
+    '''
     @pytest.mark.extraction
     def test_extractor(self, sim: Simulator, extractor: Extractor):
+        '''Base functionality test.
+        Input: arbitrary instruction
+        Verifications:
+            - entropy output value
+            - high extraction active signal
+            - low ready and flush signals
+        '''
         # set input
         extractor.IFXT_i.write(IFXT_t(0xfaa42633))
         sim.step()
@@ -23,9 +33,14 @@ class TestEntropyExtractor():
         assert out.active
         assert not out.flush_bits
     
-    # active/ready functionality
     @pytest.mark.extraction
     def test_extractor_stop(self, sim: Simulator, extractor: Extractor):
+        '''Stop/signal processing test.
+        Input: STOP instruction
+        Verifications:
+            - low extraction active signal
+            - high ready signal
+        '''
         # set input
         extractor.IFXT_i.write(IFXT_t(0xffffffff))
         sim.step()
@@ -35,9 +50,14 @@ class TestEntropyExtractor():
         assert out.ready
         assert not out.active
     
-    # enrtopy list forming
     @pytest.mark.extraction
     def test_extractor_consecutive(self, sim: Simulator, extractor: Extractor):
+        '''Entropy register fill test.
+        Input: two consecutive instructions
+        Verifications:
+            - entropy output list value and length
+            - low flush signal
+        '''
         # set input
         extractor.IFXT_i.write(IFXT_t(0xfaa42633))  # entropy = 61
         sim.step()
@@ -53,6 +73,12 @@ class TestEntropyExtractor():
     
     @pytest.mark.extraction
     def test_extractor_mixed_instructions(self, sim: Simulator, extractor: Extractor):
+        '''Instruction type distinguishment test.
+        Input: consecutive instructions of different types
+        Verifications:
+            - entropy output list value and length
+            - low flush signal
+        '''
         # set input
         extractor.IFXT_i.write(IFXT_t(0xfaa42633))  # entropy = 61
         sim.step()
@@ -72,6 +98,12 @@ class TestEntropyExtractor():
     # flush signal
     @pytest.mark.extraction
     def test_extractor_flush_signal(self, sim: Simulator, extractor: Extractor):
+        '''Flush signal high/low test
+        Input: 16 consecutive instructions, then flush ready signal
+        Verifications:
+            - entropy output list value and length
+            - flush signal set high, then low
+        '''
         extractor.TXT_i.write(TXT_t(False))
         # 16 cycles
         for _ in range(0, 8):

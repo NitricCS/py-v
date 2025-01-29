@@ -28,20 +28,11 @@ def execute_bin(
 
     # Load binary into memory
     # print("* Loading binary...")
-    # core.load_binary(path_to_bin)
-    core.load_instructions(
-        [0x33, 0x26, 0xa4, 0xfa,
-         0x33, 0x26, 0xa4, 0xf8,
-         0x33, 0x26, 0xa4, 0xfa,
-         0x33, 0x26, 0xa4, 0xf8,
-         0x33, 0x26, 0xa4, 0xfa,
-         0x33, 0x26, 0xa4, 0xf8,
-         0x33, 0x26, 0xa4, 0xfa,
-         0x33, 0x26, 0xa4, 0xf8,
-         0xff, 0xff, 0xff, 0xff]
-    )
+    core.load_binary(path_to_bin)
+    print(core.readDataMem(2048, 4))
     # Set probes
     core.setProbes([])
+    print(core.readDataMem(2048, 4))
 
     # Set fault injection cycle
     if fi_cycle:
@@ -144,8 +135,7 @@ def execute_test(
 
 #     execute_bin(core_type, program_name, path_to_bin, num_cycles)
 
-def atoi(fi_cycle):
-    core_type = "single"
+def atoi(core_type="single", fi_cycle=None):
     program_name = "ATOI"
     path_to_bin = "programs/atoi/atoi.bin"
     num_cycles = 800
@@ -154,9 +144,7 @@ def atoi(fi_cycle):
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
     return core.readDataMem(2048, 4)
 
-def entropy_test():
-    core_type = "single_entropy"
-    # core_type = "single"
+def entropy_test(core_type="single_entropy"):
     num_cycles = 500
 
     core = execute_test(core_type, num_cycles)
@@ -204,3 +192,4 @@ def main():
 if __name__ == '__main__':
     # main()
     entropy_test()
+    # atoi()
