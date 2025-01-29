@@ -140,7 +140,6 @@ class IFStage(Module):
         if active:
             if flush:
                 self.epc_reg.next.write(self.epc_reg.cur.read())
-            # elif self.epc_reg.next.read() != 0:
             else:
                 self.epc_reg.next.write(self.epc_reg.cur.read() + 4)
         elif ready:
@@ -150,12 +149,10 @@ class IFStage(Module):
         
         # split the instruction
         if active or flush or ready:
-            # self.ir_out_w.write(0x00000013)
             self.ir_out_reg.next.write(0x00000013)
         elif self.epc_reg.cur.read()<=-4:
             self.ir_out_reg.cur.write(0x00000013)
         else:
-            # self.ir_out_w.write(self.ir_reg_w.read())
             self.ir_out_reg.cur.write(self.ir_reg_w.read())
 
     def writeOutput(self):

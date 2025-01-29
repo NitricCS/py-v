@@ -60,6 +60,7 @@ class TestIFStage:
     def fetch(self, imem):
         fetch = IFStage(imem.read_port1)
         fetch._init()
+        fetch.epc_reg._reset()
         return fetch
 
     @pytest.mark.extraction
@@ -217,15 +218,16 @@ class TestIFStage:
         if_out = fetch.IFXT_o.read()
         assert if_out.inst == 0x000000000        # verify STOP instruction out of fetch
         ifid_out = fetch.IFID_o.read()
-        assert ifid_out.pc == 12                 # verify PC is not taken from input
+        assert ifid_out.pc == -8                 # verify PC reset
         assert ifid_out.inst == 0x00000013       # verify correct instruction to next stages
 
+        pc = 4                          # PC value pointing to instruction 2
         fetch.npc_i.write(pc)                    # send PC to fetch
         extractor.TXT_i.write(TXT_t(flush_bits_ready=True))       # set flush ready signal artificially
         sim.step()
         ifid_out = fetch.IFID_o.read()
-        assert ifid_out.pc == 0                  # verify PC reset
-        assert ifid_out.inst == 0xfaa42633       # verify correct instruction out of fetch
+        assert ifid_out.pc == 4                 # verify PC is taken from input
+        assert ifid_out.inst == 0xfea42633       # verify correct instruction out of fetch
 
 
 # ---------------------------------------
@@ -2081,6 +2083,7 @@ class TestMEMStage:
         imem._init()
         fetch = IFStage(imem.read_port1)
         fetch._init()
+        fetch.epc_reg._reset()
 
         fetch.XTIF_i << extractor.XTIF_o
         extractor.IFXT_i << fetch.IFXT_o
@@ -2119,13 +2122,13 @@ class TestMEMStage:
                   mem.mem[1040:1044],
                   mem.mem[1044:1048])
         
-        # assert mem.mem[64:88] == [0xf7, 0x7c, 0xcf, 0xf7,
-        #                           0xcf, 0xf7, 0x7c, 0xcf,
-        #                           0x7c, 0xcf, 0xf7, 0x7c,
-        #                           0xf0, 0x3d, 0xdf, 0x03,
-        #                           0, 0, 0, 0,
-        #                           0, 0, 0, 0]
-        # assert fetch.IFXT_o.read().inst == 0xfaa42633
+        assert mem.mem[1024:1048] == [0xf7, 0x7c, 0xcf, 0xf7,
+                                      0xcf, 0xf7, 0x7c, 0xcf,
+                                      0x7c, 0xcf, 0xf7, 0x7c,
+                                      0xf0, 0x3d, 0xdf, 0x03,
+                                      0, 0, 0, 0,
+                                      0, 0, 0, 0]
+        assert fetch.IFXT_o.read().inst == 0xfaa42633
 
     def test_exception(self, mem_stage, caplog, sim):
         mem_stage._init()
