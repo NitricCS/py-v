@@ -24,15 +24,13 @@ def execute_bin(
     elif core_type == 'single_entropy':
         core = SingleCycleEntropyModel()
 
-    print(core.readDataMem(2048, 4))
-
     # Load binary into memory
     # print("* Loading binary...")
     core.load_binary(path_to_bin)
-    print(core.readDataMem(2048, 4))
+    print("Entropy before: ", core.readDataMem(1024, 12))
     # Set probes
     core.setProbes([])
-    print(core.readDataMem(2048, 4))
+    print("Memory before execution: ", core.readDataMem(2048, 4))
 
     # Set fault injection cycle
     if fi_cycle:
@@ -135,14 +133,49 @@ def execute_test(
 
 #     execute_bin(core_type, program_name, path_to_bin, num_cycles)
 
+def fibonacci(core_type="single", fi_cycle=None):
+    program_name = 'FIBONACCI'
+    path_to_bin = 'programs/fibonacci/fibonacci.bin'
+    num_cycles = 140
+
+    core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
+    print("Program result: ", core.readDataMem(2048, 4))
+
+def fibonacci_entropy(core_type="single_entropy", fi_cycle=None):
+    program_name = 'FIBONACCI'
+    path_to_bin = 'programs/fibonacci/fibonacci_e.bin'
+    num_cycles = 800
+
+    core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
+    print("Entropy: ", core.readDataMem(1024, 12))
+    print("Program result: ", core.readDataMem(2048, 4))
+
+def simple(core_type="single", fi_cycle=None):
+    program_name = "simple"
+    path_to_bin = "programs/test/test.bin"
+    num_cycles = 200
+    core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
+    print("Program result: ", core.readDataMem(2048, 4))
+
 def atoi(core_type="single", fi_cycle=None):
     program_name = "ATOI"
     path_to_bin = "programs/atoi/atoi.bin"
-    num_cycles = 800
+    num_cycles = 1000
 
     print(f"FI on cycle {fi_cycle}...")
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
+    print("Program result: ", core.readDataMem(2048, 4))
     return core.readDataMem(2048, 4)
+
+def atoi_entropy(core_type="single_entropy", fi_cycle=None):
+    program_name = "ATOI"
+    path_to_bin = "programs/fibonacci/fibonacci_e.bin"
+    num_cycles = 1000
+
+    print(f"FI on cycle {fi_cycle}...")
+    core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
+    print("Entropy: ", core.readDataMem(1024, 12))
+    print("Program result: ", core.readDataMem(2048, 4))
 
 def entropy_test(core_type="single_entropy"):
     num_cycles = 500
@@ -190,6 +223,8 @@ def main():
 
 
 if __name__ == '__main__':
-    # main()
-    entropy_test()
+    # entropy_test()
     # atoi()
+    # fibonacci()
+    fibonacci_entropy()
+    # atoi_entropy()
