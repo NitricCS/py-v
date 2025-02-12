@@ -77,16 +77,6 @@ I_REGS = {
 
 
 # --------------------------------
-# Exceptions
-# --------------------------------
-
-class IllegalInstructionException(Exception):
-    def __init__(self, pc, inst):
-        msg = f"Illegal instruction @ PC = 0x{pc:08X} detected: '0x{inst:08x}'"
-        super().__init__(msg)
-
-
-# --------------------------------
 # Ziscr
 # --------------------------------
 CSR_F3 = {

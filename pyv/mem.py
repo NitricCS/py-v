@@ -3,6 +3,7 @@ from pyv.port import Input, Output
 from pyv.util import MASK_32, PyVObj
 from pyv.log import logger
 from pyv.clocked import Clocked, MemList
+from pyv.exceptions import SegmentationFaultException
 
 
 class ReadPort(PyVObj):
@@ -153,17 +154,20 @@ class Memory(Module, Clocked):
                     f'ERROR (Memory ({self.name}), write): Invalid width {w}')
             logger.info(
                 f"MEM {self.name}: write {wdata:08X} to address {addr:08X}")
-
-            if w == 1:  # byte
-                self.mem[addr] = 0xff & wdata
-            elif w == 2:  # half word
-                self.mem[addr] = 0xff & wdata
-                self.mem[addr + 1] = (0xff00 & wdata) >> 8
-            elif w == 4:  # word
-                self.mem[addr] = 0xff & wdata
-                self.mem[addr + 1] = (0xff00 & wdata) >> 8
-                self.mem[addr + 2] = (0xff0000 & wdata) >> 16
-                self.mem[addr + 3] = (0xff000000 & wdata) >> 24
+            
+            try:
+                if w == 1:  # byte
+                    self.mem[addr] = 0xff & wdata
+                elif w == 2:  # half word
+                    self.mem[addr] = 0xff & wdata
+                    self.mem[addr + 1] = (0xff00 & wdata) >> 8
+                elif w == 4:  # word
+                    self.mem[addr] = 0xff & wdata
+                    self.mem[addr + 1] = (0xff00 & wdata) >> 8
+                    self.mem[addr + 2] = (0xff0000 & wdata) >> 16
+                    self.mem[addr + 3] = (0xff000000 & wdata) >> 24
+            except IndexError:
+                raise SegmentationFaultException(addr)
 
     # TODO: when memory gets loaded with program *before* simulation,
     # simulation start will cause a reset. So for now, we skip the reset here.

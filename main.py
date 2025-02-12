@@ -1,5 +1,5 @@
 import time
-from pyv.isa import IllegalInstructionException
+from pyv.exceptions import IllegalInstructionException, InstructionAddressMisalignedException, PCOutOfBoundException, SegmentationFaultException
 from pyv.models.model import Model
 from pyv.models.singlecycle import SingleCycleModel
 from pyv.models.singlecycle_entropy import SingleCycleEntropyModel
@@ -32,10 +32,6 @@ def execute_bin(
     if fi_cycle:
         core.setFICycle(fi_cycle)
         print(f"FI on cycle {fi_cycle}")
-    
-    if core_type == 'single_entropy':
-        print("=== Entropy space before execution: ", core.readDataMem(1024, 12))
-    print("=== Memory before execution: ", core.readDataMem(2048, 4))
 
     # Simulate
     start = time.perf_counter()
@@ -166,7 +162,7 @@ def atoi(core_type="single", fi_cycle=None):
     num_cycles = 1000
 
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
-    print("Program result: ", core.readDataMem(2048, 4), "\n")
+    print("=== Program result: ", core.readDataMem(2048, 4), "\n")
     return core.readDataMem(2048, 4)
 
 def atoi_entropy(core_type="single_entropy", fi_cycle=None):
@@ -196,12 +192,18 @@ def inject_faults(program, core_type: str, cycle_start: int, cycle_end: int, exp
             else:
                 fi_results.append("No effect")
             # print(res)
-        except IllegalInstructionException:
+        except PCOutOfBoundException:
             fi_results.append("PC out of bound")
             print("### PC OUT OF BOUND ###")
-        # except IndexError:
-        #     fi_results.append("Other issue")
-        #     print("### MEMORY INDEX ERROR ###")
+        except SegmentationFaultException:
+            fi_results.append("Other issue")
+            print("### MEMORY INDEX ERROR ###")
+        except InstructionAddressMisalignedException:
+            fi_results.append("Other issue")
+            print("### INSTRUCTION ADDRESS MISALIGNED ###")
+        except IllegalInstructionException:
+            fi_results.append("Other issue")
+            print("### INSTRUCTION MEMORY CORRUPTED ###")
         finally:
             Simulator.globalSim.clear()
     return fi_results
@@ -224,9 +226,10 @@ def plot_fi_results(program, fi_results: list, cycle_start: int, cycle_end: int)
 
 
 def main():
-    fi_results = inject_faults(fibonacci, "single", 59, 60, ['0x37', '0x0', '0x0', '0x0'])
+    fi_results = inject_faults(atoi, "single", 20, 160, ['0xc', '0x0', '0x0', '0x0'])
+    plot_fi_results(atoi, fi_results, 20, 160)
     # fi_results = inject_faults(fibonacci_entropy, "single_entropy", 30, 32, ['0x37', '0x0', '0x0', '0x0'])
-    # plot_fi_results(fibonacci, fi_results, 30, 60)
+    # plot_fi_results(fibonacci, fi_results, 30, 32)
 
     # entropy_test()
     # atoi()
