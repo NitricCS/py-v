@@ -67,7 +67,7 @@ class PortList:
             ports_to_log = PortList.port_list
 
         for p in ports_to_log:
-            logger.info(f"{p.name}: {p.read()}")
+            logger.debug(f"{p.name}: {p.read()}")
 
     @staticmethod
     def filter(patterns: list[str]):
@@ -168,7 +168,7 @@ class PortRW(Port, Generic[T]):
     def _propagate(self, oldVal: T, newVal: T):
         """Propagate a value change.
         """
-        logger.info(f"Port {self.name} changed from {oldVal} to {newVal}.")
+        logger.debug(f"Port {self.name} changed from {oldVal} to {newVal}.")
 
         for port in self._downstreamInputs:
             logger.debug(f"Notifying {port.name}")
