@@ -31,10 +31,11 @@ def execute_bin(
     # Set fault injection cycle
     if fi_cycle:
         core.setFICycle(fi_cycle)
-        print(f"FI on cycle {fi_cycle}...")
-
-    print("Entropy space before execution: ", core.readDataMem(1024, 12))
-    print("Memory before execution: ", core.readDataMem(2048, 4))
+        print(f"FI on cycle {fi_cycle}")
+    
+    if core_type == 'single_entropy':
+        print("=== Entropy space before execution: ", core.readDataMem(1024, 12))
+    print("=== Memory before execution: ", core.readDataMem(2048, 4))
 
     # Simulate
     start = time.perf_counter()
@@ -138,7 +139,7 @@ def fibonacci(core_type="single", fi_cycle=None):
 
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
     result = core.readDataMem(2048, 4)
-    print("Program result: ", result)
+    print("Program result: ", result, "\n")
     return result
 
 def fibonacci_entropy(core_type="single_entropy", fi_cycle=None):
@@ -148,8 +149,8 @@ def fibonacci_entropy(core_type="single_entropy", fi_cycle=None):
 
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
     result = core.readDataMem(2048, 4)
-    print("Entropy: ", core.readDataMem(1024, 12))
-    print("Program result: ", result)
+    print("=== Entropy: ", core.readDataMem(1024, 12))
+    print("=== Program result: ", result, "\n")
     return result
 
 def simple(core_type="single", fi_cycle=None):
@@ -157,7 +158,7 @@ def simple(core_type="single", fi_cycle=None):
     program_name="memory write test"
     num_cycles = 200
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
-    print("Program result: ", core.readDataMem(2048, 4))
+    print("=== Program result: ", core.readDataMem(2048, 4), "\n")
 
 def atoi(core_type="single", fi_cycle=None):
     path_to_bin = "programs/atoi/atoi.bin"
@@ -165,24 +166,24 @@ def atoi(core_type="single", fi_cycle=None):
     num_cycles = 1000
 
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
-    print("Program result: ", core.readDataMem(2048, 4))
+    print("Program result: ", core.readDataMem(2048, 4), "\n")
     return core.readDataMem(2048, 4)
 
 def atoi_entropy(core_type="single_entropy", fi_cycle=None):
-    path_to_bin = "programs/fibonacci/fibonacci_e.bin"
+    path_to_bin = "programs/atoi/atoi.bin"
     program_name="atoi with entropy"
     num_cycles = 1000
 
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_cycle)
-    print("Entropy: ", core.readDataMem(1024, 12))
-    print("Program result: ", core.readDataMem(2048, 4))
+    print("=== Entropy: ", core.readDataMem(1024, 12))
+    print("=== Program result: ", core.readDataMem(2048, 4), "\n")
 
 def entropy_test(core_type="single_entropy"):
     num_cycles = 500
 
     core = execute_test(core_type, num_cycles)
-    print("Entropy: ", core.readDataMem(1024, 12))
-    print("Program result: ", core.readDataMem(2048, 4))
+    print("=== Entropy: ", core.readDataMem(1024, 12))
+    print("=== Program result: ", core.readDataMem(2048, 4))
 
 def inject_faults(program, core_type: str, cycle_start: int, cycle_end: int, expected_result) -> list:
     fi_results = []
@@ -198,9 +199,9 @@ def inject_faults(program, core_type: str, cycle_start: int, cycle_end: int, exp
         except IllegalInstructionException:
             fi_results.append("PC out of bound")
             print("### PC OUT OF BOUND ###")
-        except IndexError:
-            fi_results.append("Other issue")
-            print("### MEMORY INDEX ERROR ###")
+        # except IndexError:
+        #     fi_results.append("Other issue")
+        #     print("### MEMORY INDEX ERROR ###")
         finally:
             Simulator.globalSim.clear()
     return fi_results
@@ -223,11 +224,13 @@ def plot_fi_results(program, fi_results: list, cycle_start: int, cycle_end: int)
 
 
 def main():
-    fi_results = inject_faults(fibonacci_entropy, "single_entropy", 30, 32, ['0x37', '0x0', '0x0', '0x0'])
-    plot_fi_results(fibonacci_entropy, fi_results, 30, 32)
+    fi_results = inject_faults(fibonacci, "single", 59, 60, ['0x37', '0x0', '0x0', '0x0'])
+    # fi_results = inject_faults(fibonacci_entropy, "single_entropy", 30, 32, ['0x37', '0x0', '0x0', '0x0'])
+    # plot_fi_results(fibonacci, fi_results, 30, 60)
 
     # entropy_test()
     # atoi()
+    # atoi_entropy()
     # fibonacci()
     # fibonacci_entropy()
     # simple()

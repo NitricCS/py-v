@@ -215,9 +215,11 @@ class IDStage(Module):
 
         # funct3, funct7
         funct3 = getBits(inst, 14, 12)
-        # funct7 = getBits(inst, 31, 25)
-        f7_bit = getBit(inst, 30)
-        funct7 = int(f"0{f7_bit}00000", 2)
+        if opcode == isa.OPCODES['OP']:
+            f7_bit = getBit(inst, 30)
+            funct7 = int(f"0{f7_bit}00000", 2)
+        else:
+            funct7 = getBits(inst, 31, 25)
 
         self.check_exception_inputs = (inst, opcode, funct3, funct7)
 
