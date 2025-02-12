@@ -155,9 +155,7 @@ class IDStage(Module):
 
         if fi_cycle and curr_cycle == fi_cycle:
             ### Inject fault
-            fault = 0b1000000000000000
-            inst = inst ^ fault
-            # inst = inst | (1 << 16)
+            inst = self.inject_fault(inst, 12, 2, "flip")
             logger.info(f"Instruction after FI: {inst:08X}")
 
         # funct3, funct7
@@ -197,6 +195,20 @@ class IDStage(Module):
         self.IDEX_o.write(IDEX_t(
             rs1, rs2, imm, self.pc, rd_idx, we, wb_sel,
             opcode, funct3, funct7, mem, csr_addr, csr_read_val, csr_write_en))
+
+    def inject_fault(self, inst, index, num_bits, injection_type):
+        if injection_type == "flip":
+            fault = int('0'*(32-(index+num_bits)) + '1'*num_bits + '0'*(index), 2)
+            inst_fi = inst ^ fault
+        elif injection_type == "set":
+            fault = int('0'*(32-(index+num_bits)) + '1'*num_bits + '0'*(index), 2)
+            inst_fi = inst | fault
+        elif injection_type == "clear":
+            fault = int('1'*(32-(index+num_bits)) + '0'*num_bits + '1'*(index), 2)
+            inst_fi = inst & fault
+        else:
+            return inst
+        return inst_fi
 
     def is_csr(self, opcode, f3):
         return opcode == isa.OPCODES["SYSTEM"] and f3 in isa.CSR_F3.values()

@@ -204,6 +204,9 @@ def inject_faults(program, core_type: str, cycle_start: int, cycle_end: int, exp
         except IllegalInstructionException:
             fi_results.append("Other issue")
             print("### INSTRUCTION MEMORY CORRUPTED ###")
+        except Exception:
+            fi_results.append("Other issue")
+            print("### PROCESSOR FUNCTIONING VIOLATED ###")
         finally:
             Simulator.globalSim.clear()
     return fi_results
@@ -226,8 +229,8 @@ def plot_fi_results(program, fi_results: list, cycle_start: int, cycle_end: int)
 
 
 def main():
-    fi_results = inject_faults(atoi, "single", 20, 160, ['0xc', '0x0', '0x0', '0x0'])
-    plot_fi_results(atoi, fi_results, 20, 160)
+    fi_results = inject_faults(atoi, "single", 20, 40, ['0xc', '0x0', '0x0', '0x0'])
+    plot_fi_results(atoi, fi_results, 20, 40)
     # fi_results = inject_faults(fibonacci_entropy, "single_entropy", 30, 32, ['0x37', '0x0', '0x0', '0x0'])
     # plot_fi_results(fibonacci, fi_results, 30, 32)
 

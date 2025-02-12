@@ -5,6 +5,7 @@ from pyv.reg import Reg, Regfile
 from pyv.mem import ReadPort, WritePort
 from pyv.simulator import Simulator
 from pyv.extractor import IFXT_t, XTIF_t, TXT_t
+from pyv.exceptions import PCOutOfBoundException, InstructionAddressMisalignedException, IllegalInstructionException
 import pyv.isa as isa
 from pyv.util import getBit, getBits, MASK_32, XLEN, msb_32, signext
 from pyv.log import logger
@@ -176,6 +177,8 @@ class IDStage(Module):
         super().__init__()
         self.regfile = regf
         self.csr = csr
+        
+        self.pc_bound = 0
 
         self.registerStableCallbacks([self.check_exception])
         self.STOP_INSTR = 0xffffffff
@@ -204,13 +207,10 @@ class IDStage(Module):
 
         # Determine opcode (inst[6:2])
         opcode = getBits(inst, 6, 2)
-        logger.info(f"Current instruction opcode: {opcode:08X}")
 
         if fi_cycle and curr_cycle == fi_cycle:
             ### Inject fault
-            fault = 0b1000000000000000
-            inst = inst ^ fault
-            # inst = inst | (1 << 16)
+            inst = self.inject_fault(inst, 12, 2, "flip")
             logger.info(f"Instruction after FI: {inst:08X}")
 
         # funct3, funct7
@@ -221,7 +221,7 @@ class IDStage(Module):
         else:
             funct7 = getBits(inst, 31, 25)
 
-        self.check_exception_inputs = (inst, opcode, funct3, funct7)
+        self.check_exception_inputs = (self.pc, inst, opcode, funct3, funct7)
 
         # Determine register indeces
         rs1_idx = getBits(inst, 19, 15)
@@ -254,7 +254,21 @@ class IDStage(Module):
         self.IDEX_o.write(IDEX_t(
             rs1, rs2, imm, self.pc, rd_idx, we, wb_sel,
             opcode, funct3, funct7, mem, csr_addr, csr_read_val, csr_write_en))
-
+    
+    def inject_fault(self, inst, index, num_bits, injection_type):
+        if injection_type == "flip":
+            fault = int('0'*(32-(index+num_bits)) + '1'*num_bits + '0'*(index), 2)
+            inst_fi = inst ^ fault
+        elif injection_type == "set":
+            fault = int('0'*(32-(index+num_bits)) + '1'*num_bits + '0'*(index), 2)
+            inst_fi = inst | fault
+        elif injection_type == "clear":
+            fault = int('1'*(32-(index+num_bits)) + '0'*num_bits + '1'*(index), 2)
+            inst_fi = inst & fault
+        else:
+            return inst
+        return inst_fi
+    
     def is_csr(self, opcode, f3):
         return opcode == isa.OPCODES["SYSTEM"] and f3 in isa.CSR_F3.values()
 
@@ -400,50 +414,53 @@ class IDStage(Module):
         return csr_addr, csr_read_val, csr_write_en, csr_isImm, csr_uimm
 
     def check_exception(self):
-        inst, opcode, f3, f7 = self.check_exception_inputs
+        pc, inst, opcode, f3, f7 = self.check_exception_inputs
         illinst = False
+
+        if pc > self.pc_bound:
+            raise PCOutOfBoundException(pc)
 
         # Illegal instruction if bits 1:0 of inst != b11
         if (inst & 0x3) != 0x3:
-            raise isa.IllegalInstructionException(self.pc, inst)
+            raise IllegalInstructionException(self.pc, inst)
 
         if opcode not in isa.OPCODES.values():
-            raise isa.IllegalInstructionException(self.pc, inst)
+            raise IllegalInstructionException(self.pc, inst)
 
         if opcode == isa.OPCODES['OP-IMM']:
             if f3 == 0b001 and f7 != 0:  # SLLI
-                raise isa.IllegalInstructionException(self.pc, inst)
+                raise IllegalInstructionException(self.pc, inst)
                 illinst = True
             elif f3 == 0b101 and not (f7 == 0 or f7 == 0b0100000):  # SRLI,SRAI
-                raise isa.IllegalInstructionException(self.pc, inst)
+                raise IllegalInstructionException(self.pc, inst)
                 illinst = True
 
         if opcode == isa.OPCODES['OP']:
             if not (f7 == 0 or f7 == 0b0100000):
-                raise isa.IllegalInstructionException(self.pc, inst)
+                raise IllegalInstructionException(self.pc, inst)
                 illinst = True
             elif f7 == 0b0100000 and not (f3 == 0b000 or f3 == 0b101):
-                raise isa.IllegalInstructionException(self.pc, inst)
+                raise IllegalInstructionException(self.pc, inst)
                 illinst = True
 
         if opcode == isa.OPCODES['JALR']:
             if f3 != 0:
-                raise isa.IllegalInstructionException(self.pc, inst)
+                raise IllegalInstructionException(self.pc, inst)
                 illinst = True
 
         if opcode == isa.OPCODES['BRANCH']:
             if f3 == 2 or f3 == 3:
-                raise isa.IllegalInstructionException(self.pc, inst)
+                raise IllegalInstructionException(self.pc, inst)
                 illinst = True
 
         if opcode == isa.OPCODES['LOAD']:
             if f3 == 3 or f3 == 6 or f3 == 7:
-                raise isa.IllegalInstructionException(self.pc, inst)
+                raise IllegalInstructionException(self.pc, inst)
                 illinst = True
 
         if opcode == isa.OPCODES['STORE']:
             if f3 > 2:
-                raise isa.IllegalInstructionException(self.pc, inst)
+                raise IllegalInstructionException(self.pc, inst)
                 illinst = True  # noqa: F841
 
         # TODO: do something with illinst
@@ -778,7 +795,8 @@ class EXStage(Module):
         # --- Branch/jump target misaligned ------
         if take_branch:
             if alu_res & 0x3 != 0:
-                raise Exception(f"Target instruction address misaligned exception at PC = 0x{pc:08X}")  # noqa: E501
+                # raise Exception(f"Target instruction address misaligned exception at PC = 0x{pc:08X}")  # noqa: E501
+                raise InstructionAddressMisalignedException(pc)
 
     def csr(self, f3, csr_read_val, rs1):
         ret_val = 0

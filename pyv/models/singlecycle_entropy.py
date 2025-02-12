@@ -117,6 +117,7 @@ class SingleCycleEntropyModel(Model):
         inst.extend((255, 255, 255, 255))
 
         self.core.mem.mem[:len(inst)] = inst
+        self.core.id_stg.pc_bound = len(inst) - 4
 
     def readReg(self, reg):
         """Read a register in the register file.
