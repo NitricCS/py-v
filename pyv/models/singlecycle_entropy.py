@@ -114,6 +114,8 @@ class SingleCycleEntropyModel(Model):
         ba = bytearray(f.read())
         f.close()
         inst = list(ba)
+        for _ in range(0,4):
+            inst.append(255)
 
         self.core.mem.mem[:len(inst)] = inst
 
