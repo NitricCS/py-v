@@ -155,11 +155,31 @@ class IFStage(Module):
             self.ir_out_reg.cur.write(0x00000013)
         else:
             self.ir_out_reg.cur.write(self.ir_reg_w.read())
+        
+    def inject_fault(self, inst: int, index: int, num_bits: int, injection_type: str) -> int:
+        logger.info(f"FI: Instruction before fault: {inst:08X}")
+        if injection_type == "flip":
+            fault = int('0'*(32-(index+num_bits)) + '1'*num_bits + '0'*(index), 2)
+            inst_fi = inst ^ fault
+        elif injection_type == "set":
+            fault = int('0'*(32-(index+num_bits)) + '1'*num_bits + '0'*(index), 2)
+            inst_fi = inst | fault
+        elif injection_type == "clear":
+            fault = int('1'*(32-(index+num_bits)) + '0'*num_bits + '1'*(index), 2)
+            inst_fi = inst & fault
+        else:
+            return inst
+        return inst_fi
 
     def writeOutput(self):
-        # self.IFID_o.write(IFID_t(self.ir_out_w.read(), self.pc_reg_w.read()))
-        self.IFID_o.write(IFID_t(self.ir_out_reg.cur.read(), self.pc_reg_w.read()))
-        self.IFXT_o.write(IFXT_t(self.ir_reg_w.read()))      # output instruction to extractor
+        curr_cycle = Simulator.globalSim.getCycles() - 1
+        fi_cycle, fi_index, num_bits, fi_type = Simulator.globalSim.getFIParams()
+        if fi_cycle and curr_cycle == fi_cycle:
+            self.IFID_o.write(IFID_t(self.inject_fault(self.ir_out_reg.cur.read(), fi_index, num_bits, fi_type), self.pc_reg_w.read()))
+            self.IFXT_o.write(IFXT_t(self.inject_fault(self.ir_reg_w.read(), fi_index, num_bits, fi_type)))
+        else:
+            self.IFID_o.write(IFID_t(self.ir_out_reg.cur.read(), self.pc_reg_w.read()))
+            self.IFXT_o.write(IFXT_t(self.ir_reg_w.read()))      # output instruction to extractor
         self.XT_o.write(self.XT_w.read())
 
 
@@ -195,11 +215,8 @@ class IDStage(Module):
         val: IFID_t = self.IFID_i.read()
         inst = val.inst
         self.pc = val.pc
-        logger.info(f"Fetched instruction code: {inst:08X}")
+        logger.info(f"Instruction to decode: {inst:08X}")
         logger.info(f"Current PC: {self.pc:08X}")
-
-        curr_cycle = Simulator.globalSim.getCycles() - 1
-        fi_cycle = Simulator.globalSim.getFICycle()
 
         # entropy extraction stop instruction replacement
         if inst == self.STOP_INSTR:
@@ -207,11 +224,6 @@ class IDStage(Module):
 
         # Determine opcode (inst[6:2])
         opcode = getBits(inst, 6, 2)
-
-        if fi_cycle and curr_cycle == fi_cycle:
-            ### Inject fault
-            inst = self.inject_fault(inst, 12, 2, "flip")
-            logger.info(f"Instruction after FI: {inst:08X}")
 
         # funct3, funct7
         funct3 = getBits(inst, 14, 12)
@@ -254,20 +266,6 @@ class IDStage(Module):
         self.IDEX_o.write(IDEX_t(
             rs1, rs2, imm, self.pc, rd_idx, we, wb_sel,
             opcode, funct3, funct7, mem, csr_addr, csr_read_val, csr_write_en))
-    
-    def inject_fault(self, inst, index, num_bits, injection_type):
-        if injection_type == "flip":
-            fault = int('0'*(32-(index+num_bits)) + '1'*num_bits + '0'*(index), 2)
-            inst_fi = inst ^ fault
-        elif injection_type == "set":
-            fault = int('0'*(32-(index+num_bits)) + '1'*num_bits + '0'*(index), 2)
-            inst_fi = inst | fault
-        elif injection_type == "clear":
-            fault = int('1'*(32-(index+num_bits)) + '0'*num_bits + '1'*(index), 2)
-            inst_fi = inst & fault
-        else:
-            return inst
-        return inst_fi
     
     def is_csr(self, opcode, f3):
         return opcode == isa.OPCODES["SYSTEM"] and f3 in isa.CSR_F3.values()

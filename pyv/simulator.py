@@ -65,6 +65,12 @@ class Simulator:
     
     def setFICycle(self, fi_cycle):
         self._fi_cycle = fi_cycle
+    
+    def setFIParams(self, fi_cycle, fi_index, num_bits, fi_type):
+        self._fi_cycle = fi_cycle
+        self._fi_index = fi_index
+        self._num_bits = num_bits
+        self._fi_type = fi_type
 
     def _log_cycle(self):
         logger.info(f"\n**** Cycle {self._cycles} ****")
@@ -191,6 +197,11 @@ class Simulator:
         if self._fi_cycle:
             return self._fi_cycle
         return None
+    
+    def getFIParams(self):
+        if self._fi_cycle:
+            return (self._fi_cycle, self._fi_index, self._num_bits, self._fi_type)
+        return (None, None, None, None)
 
     def postEventAbs(self, time_abs, callback):
         """Post an event into the future with *absolute* time.

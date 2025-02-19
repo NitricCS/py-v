@@ -11,5 +11,6 @@ venv
 gitlint.test
 *.diff
 launch.json
+figs
 
 .vscode
