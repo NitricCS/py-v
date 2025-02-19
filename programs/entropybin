@@ -1,0 +1,18 @@
+#RISCV=riscv64-unknown-elf-
+RISCV=~/riscv-entropy_injection/install/compiler/bin/riscv32-unknown-elf-
+RISCV_GCC_OPTS=-march=rv32i -mabi=ilp32 -nostartfiles common/crt.S
+
+all: memset
+
+.PHONY: atoi
+atoi: atoi/atoi_e.out
+	$(RISCV)objdump -d $@/$@_e.out > $@/$@_e.out.dmp
+	$(RISCV)objcopy -O binary $@/$@_e.out $@/$@_e.bin
+	hexdump $@/$@_e.bin > $@/$@_e.bin.dmp
+
+.PHONY: memset
+memset: memset/memset_e.out
+	$(RISCV)objdump -d $@/$@_e.out > $@/$@_e.out.dmp
+	$(RISCV)objcopy -O binary $@/$@_e.out $@/$@_e.bin
+	hexdump $@/$@_e.bin > $@/$@_e.bin.dmp
+

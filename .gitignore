@@ -1,5 +1,6 @@
 __pycache__
 *.bin
+*.exe
 *.out
 *.dmp
 *.log
@@ -11,5 +12,4 @@ gitlint.test
 *.diff
 launch.json
 
-programs
 .vscode
