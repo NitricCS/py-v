@@ -12,5 +12,6 @@ gitlint.test
 *.diff
 launch.json
 figs
+/data
 
 .vscode

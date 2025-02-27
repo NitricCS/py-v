@@ -5,6 +5,7 @@ import pyv.isa as isa
 from pyv.util import getBit, getBits
 from pyv.log import logger
 from dataclasses import dataclass, field
+import time
 
 STOP_INSTR = 0xffffffff
 
@@ -60,6 +61,7 @@ class Extractor(Module):
 
         # set ready signal
         if inst == STOP_INSTR:
+            logger.info(f"Mode switch timestamp: {time.perf_counter()}")
             self.ready = True
         
         # set ready output

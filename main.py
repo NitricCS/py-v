@@ -5,6 +5,7 @@ from pyv.models.model import Model
 from pyv.models.singlecycle import SingleCycleModel
 from pyv.models.singlecycle_entropy import SingleCycleEntropyModel
 from pyv.simulator import Simulator
+from pyv.log import logger
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -38,6 +39,7 @@ def execute_bin(
 
     # Simulate
     start = time.perf_counter()
+    logger.info(f"Starting timestamp: {time.perf_counter()}")
     core.run(num_cycles)
     end = time.perf_counter()
 
@@ -134,7 +136,7 @@ def execute_test(
 def fibonacci(core_type="single", fi_params=(None, None, None, None)):
     path_to_bin = 'programs/fibonacci/fibonacci.bin'
     program_name="fibonacci"
-    num_cycles = 140
+    num_cycles = 137
 
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_params)
     result = core.readDataMem(2048, 4)
@@ -144,7 +146,7 @@ def fibonacci(core_type="single", fi_params=(None, None, None, None)):
 def fibonacci_entropy(core_type="single_entropy", fi_params=(None, None, None, None)):
     path_to_bin = 'programs/fibonacci/fibonacci_e.bin'
     program_name="fibonacci with entropy"
-    num_cycles = 220
+    num_cycles = 178
 
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_params)
     result = core.readDataMem(2048, 4)
@@ -162,7 +164,7 @@ def simple(core_type="single", fi_params=(None, None, None, None)):
 def atoi(core_type="single", fi_params=(None, None, None, None)):
     path_to_bin = "programs/atoi/atoi.bin"
     program_name="atoi"
-    num_cycles = 1000
+    num_cycles = 800
 
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_params)
     print("=== Program result: ", core.readDataMem(2048, 4), "\n")
@@ -171,7 +173,7 @@ def atoi(core_type="single", fi_params=(None, None, None, None)):
 def atoi_entropy(core_type="single_entropy", fi_params=(None, None, None, None)):
     path_to_bin = "programs/atoi/atoi_e.bin"
     program_name="atoi with entropy"
-    num_cycles = 3000
+    num_cycles = 2417
 
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_params)
     print("=== Entropy: ", core.readDataMem(1024, 12))
@@ -181,16 +183,16 @@ def atoi_entropy(core_type="single_entropy", fi_params=(None, None, None, None))
 def strcpy(core_type="single", fi_params=(None, None, None, None)):
     path_to_bin = "programs/strcpy/strcpy.bin"
     program_name="strcpy"
-    num_cycles = 180
+    num_cycles = 161
 
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_params)
     print("=== Program results: ", core.readDataMem(2048, 8), core.readDataMem(2082, 8), "\n")
     return (core.readDataMem(2048, 8), core.readDataMem(2082, 8))
 
 def strcpy_entropy(core_type="single_entropy", fi_params=(None, None, None, None)):
-    path_to_bin = "programs/strcpy/strcpy.bin"
+    path_to_bin = "programs/strcpy/strcpy_e.bin"
     program_name="strcpy with entropy"
-    num_cycles = 1500
+    num_cycles = 265
 
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_params)
     print("=== Entropy: ", core.readDataMem(1024, 12))
@@ -209,7 +211,7 @@ def itoa(core_type="single", fi_params=(None, None, None, None)):
 def memset(core_type="single", fi_params=(None, None, None, None)):
     path_to_bin = "programs/memset/memset.bin"
     program_name="memset"
-    num_cycles = 40
+    num_cycles = 30
 
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_params)
     print("=== Program result: ", core.readDataMem(2048, 4), "\n")
@@ -218,7 +220,7 @@ def memset(core_type="single", fi_params=(None, None, None, None)):
 def memset_entropy(core_type="single_entropy", fi_params=(None, None, None, None)):
     path_to_bin = "programs/memset/memset_e.bin"
     program_name="memset with entropy"
-    num_cycles = 600
+    num_cycles = 108
 
     core = execute_bin(core_type, program_name, path_to_bin, num_cycles, fi_params)
     print("=== Entropy: ", core.readDataMem(1024, 12))
@@ -290,16 +292,16 @@ def plot_fi_results(program, fi_results: list, cycle_start: int, cycle_end: int,
 
 
 def main():
-    settings = {
-        "program": atoi_entropy,
-        "core_type": "single_entropy",
-        "cycle_start": 40,
-        "cycle_end": 60,
-        "expected_result": ['0xd2', '0x4', '0x0', '0x0'],
-        "fi_index": 28,
-        "num_bits": 1,
-        "fi_type": "flip"
-    }
+    # settings = {
+    #     "program": atoi,
+    #     "core_type": "single",
+    #     "cycle_start": 20,
+    #     "cycle_end": 160,
+    #     "expected_result": ['0xd2', '0x4', '0x0', '0x0'],
+    #     "fi_index": 12,
+    #     "num_bits": 1,
+    #     "fi_type": "flip"
+    # }
 
     # fi_results = inject_faults(**settings)
 
@@ -310,8 +312,8 @@ def main():
     # plot_fi_results(fibonacci, fi_results, 30, 32)
 
     # entropy_test()
-    # atoi()
-    atoi_entropy()
+    atoi()
+    # atoi_entropy()
     # strcpy()
     # strcpy_entropy()
     # memset()
