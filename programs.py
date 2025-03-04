@@ -1,6 +1,4 @@
 import time
-from datetime import datetime
-from pyv.exceptions import IllegalInstructionException, InstructionAddressMisalignedException, PCOutOfBoundException, SegmentationFaultException
 from pyv.models.model import Model
 from pyv.models.singlecycle import SingleCycleModel
 from pyv.models.singlecycle_entropy import SingleCycleEntropyModel
@@ -120,3 +118,43 @@ def memset_entropy(core_type="single_entropy", fi_params=(None, None, None, None
     print("=== Entropy: ", core.readDataMem(1024, 12))
     print("=== Program result: ", core.readDataMem(2048, 4), "\n")
     return core.readDataMem(2048, 4)
+
+### Legacy below
+
+# def loop_acc():
+#     core_type = 'single'
+#     program_name = 'LOOP_ACC'
+#     path_to_bin = 'programs/loop_acc/loop_acc.bin'
+#     num_cycles = 2010
+
+#     core = execute_bin(core_type, program_name, path_to_bin, num_cycles)
+
+#     # Print register and memory contents
+#     print("x1 = " + str(core.readReg(1)))
+#     print("x2 = " + str(core.readReg(2)))
+#     print("x5 = " + str(core.readReg(5)))
+#     print("pc = " + str(hex(core.readPC())))
+#     print("mem@4096 = ", core.readDataMem(4096, 4))
+#     print("")
+
+
+# def fibonacci():
+#     core_type = 'single'
+#     program_name = 'FIBONACCI'
+#     path_to_bin = 'programs/fibonacci/fibonacci.bin'
+#     num_cycles = 140
+
+#     core = execute_bin(core_type, program_name, path_to_bin, num_cycles)
+
+#     # Print result
+#     print("Result = ", core.readDataMem(2048, 4))
+#     print("")
+
+
+# def endless_loop():
+#     core_type = 'single'
+#     program_name = 'ENDLESS_LOOP'
+#     path_to_bin = 'programs/endless_loop/endless_loop.bin'
+#     num_cycles = 1000
+
+#     execute_bin(core_type, program_name, path_to_bin, num_cycles)
