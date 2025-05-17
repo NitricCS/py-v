@@ -5,6 +5,7 @@ from pyv.models.singlecycle import SingleCycleModel
 from pyv.models.singlecycle_entropy import SingleCycleEntropyModel
 from pyv.simulator import Simulator
 from pyv.log import logger
+from testbench import Testbench
 
 import programs
 
@@ -64,7 +65,8 @@ def entropy_test(core_type="single_entropy"):
     print("=== Program result: ", core.readDataMem(2048, 4))
 
 def main():
-    programs.atoi()
+    bench = Testbench()
+    programs.memset()
 
 if __name__ == '__main__':
     main()

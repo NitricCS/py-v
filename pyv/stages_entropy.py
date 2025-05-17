@@ -156,27 +156,20 @@ class IFStage(Module):
         else:
             self.ir_out_reg.cur.write(self.ir_reg_w.read())
         
-    def inject_fault(self, inst: int, index: int, num_bits: int, injection_type: str) -> int:
+    def inject_fault(self, inst: int, index: int, num_bits: int) -> int:
         logger.info(f"FI: Instruction before fault: {inst:08X}")
-        if injection_type == "flip":
-            fault = int('0'*(32-(index+num_bits)) + '1'*num_bits + '0'*(index), 2)
-            inst_fi = inst ^ fault
-        elif injection_type == "set":
-            fault = int('0'*(32-(index+num_bits)) + '1'*num_bits + '0'*(index), 2)
-            inst_fi = inst | fault
-        elif injection_type == "clear":
-            fault = int('1'*(32-(index+num_bits)) + '0'*num_bits + '1'*(index), 2)
-            inst_fi = inst & fault
-        else:
-            return inst
+        fault = int('1'*(32-(index+num_bits)) + '0'*num_bits + '1'*(index), 2)
+        inst_fi = inst & fault
+        # else:
+        #     return inst
         return inst_fi
 
     def writeOutput(self):
         curr_cycle = Simulator.globalSim.getCycles() - 1
-        fi_cycle, fi_index, num_bits, fi_type = Simulator.globalSim.getFIParams()
+        fi_cycle, fi_index, num_bits = Simulator.globalSim.getFIParams()
         if fi_cycle and curr_cycle == fi_cycle:
-            self.IFID_o.write(IFID_t(self.inject_fault(self.ir_out_reg.cur.read(), fi_index, num_bits, fi_type), self.pc_reg_w.read()))
-            self.IFXT_o.write(IFXT_t(self.inject_fault(self.ir_reg_w.read(), fi_index, num_bits, fi_type)))
+            self.IFID_o.write(IFID_t(self.inject_fault(self.ir_out_reg.cur.read(), fi_index, num_bits), self.pc_reg_w.read()))
+            self.IFXT_o.write(IFXT_t(self.inject_fault(self.ir_reg_w.read(), fi_index, num_bits)))
         else:
             self.IFID_o.write(IFID_t(self.ir_out_reg.cur.read(), self.pc_reg_w.read()))
             self.IFXT_o.write(IFXT_t(self.ir_reg_w.read()))      # output instruction to extractor

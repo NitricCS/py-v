@@ -13,5 +13,6 @@ gitlint.test
 launch.json
 figs
 /data
+*.html
 
 .vscode

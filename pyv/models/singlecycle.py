@@ -94,6 +94,8 @@ class SingleCycleModel(Model):
             instructions (list): List of instruction words.
         """
         self.core.mem.mem[:len(instructions)] = instructions
+        
+        self.core.id_stg.pc_bound = len(instructions) - 4
 
     def load_binary(self, file):
         """Load a program binary into the instruction memory.

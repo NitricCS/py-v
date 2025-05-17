@@ -49,8 +49,8 @@ class Model:
         self.sim.setFICycle(fi_cycle)
     
     def setFIParams(self, fi_params: tuple):
-        fi_cycle, fi_index, num_bits, fi_type = fi_params
-        self.sim.setFIParams(fi_cycle, fi_index, num_bits, fi_type)
+        fi_cycle, fi_index, num_bits = fi_params
+        self.sim.setFIParams(fi_cycle, fi_index, num_bits)
 
     def run(self, num_cycles=1):
         """Runs the simulation.

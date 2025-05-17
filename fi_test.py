@@ -1,35 +1,20 @@
+import re
 import sqlite3
+import programs
+from matplotlib import pyplot as plt
+import numpy as np
+from datetime import datetime
 from pyv.exceptions import IllegalInstructionException, InstructionAddressMisalignedException, PCOutOfBoundException, SegmentationFaultException
 from pyv.simulator import Simulator
-import programs
-from matplotlib import pyplot as plt, numpy as np
-from datetime import datetime
+from testbench import Testbench
 
-
-class Testbench():
-    def __init__(self):
-        self.entropy_result = []
-        self.program_result = []
-        self.expected_results = {
-            "memset": ['0xff', '0x4', '0x0', '0x0'],
-            "strcpy": (['0x53', '0x61', '0x6d', '0x70', '0x6c', '0x65', '0x0', '0x0'], ['0x63', '0x6f', '0x70', '0x69', '0x65', '0x64', '0x0', '0x0']),
-            "fibonacci": ['0x37', '0x0', '0x0', '0x0'],
-            "atoi": ['0xd2', '0x4', '0x0', '0x0']
-        }
-
-
-expected_results = {
-    "memset": ['0xff', '0x4', '0x0', '0x0'],
-    "strcpy": (['0x53', '0x61', '0x6d', '0x70', '0x6c', '0x65', '0x0', '0x0'], ['0x63', '0x6f', '0x70', '0x69', '0x65', '0x64', '0x0', '0x0']),
-    "fibonacci": ['0x37', '0x0', '0x0', '0x0'],
-    "atoi": ['0xd2', '0x4', '0x0', '0x0']
-}
-
-conn = sqlite3.connect('data/fi.db')
+conn = sqlite3.connect('data/fi_full.db')
 c = conn.cursor()
 
-def insert_result(program_name, bit_index, cycle, fi_type, fi_result):
-    c.execute(f"INSERT INTO {program_name} (program_name, fi_bit_index, fi_cycle, fi_type, fi_result) VALUES (\'{program_name}\', {bit_index}, {cycle}, \'{fi_type}\', \'{fi_result}\')")
+# def insert_result(program_name, bit_index, cycle, num_bits, fi_result, end_cycle, entropy_corr):
+def insert_result(program_name, bit_index, cycle, num_bits, fi_result, end_cycle):
+    # c.execute(f"INSERT INTO {program_name} (program_name, fi_bit_index, fi_cycle, num_bits, fi_result, end_cycle, entropy_corrupted) VALUES (\'{program_name}\', {bit_index}, {cycle}, \'{num_bits}\', \'{fi_result}\', \'{end_cycle}\', \'{entropy_corr}\')")
+    c.execute(f"INSERT INTO {program_name} (program_name, fi_bit_index, fi_cycle, num_bits, fi_result, end_cycle) VALUES (\'{program_name}\', {bit_index}, {cycle}, \'{num_bits}\', \'{fi_result}\', \'{end_cycle}\')")
     conn.commit()
 
 def clear_table(program_name):
@@ -41,14 +26,15 @@ def inject_faults(program,
                   cycle_start: int,
                   cycle_end: int,
                   fi_index: int,
-                  num_bits: int,
-                  fi_type: str) -> list:
-    expected_result = expected_results[program.__name__]
+                  num_bits: int) -> list:
+    program_name = re.sub("_entropy", "", program.__name__)
+    # program_name = program.__name__
     for fi_cycle in range(cycle_start, cycle_end):
-        fi_params = (fi_cycle, fi_index, num_bits, fi_type)
+        # entropy_corr = 0
+        fi_params = (fi_cycle, fi_index, num_bits)
         try:
-            res = program(core_type, fi_params)
-            if res != expected_result:
+            program(core_type, fi_params)
+            if not Testbench.bench.result_is_correct(program_name):
                 fi_result = 'target_meet'
                 print("### TARGET MEET ###")
             else:
@@ -70,7 +56,11 @@ def inject_faults(program,
             print("### PROCESSOR FUNCTIONING VIOLATED ###")
         finally:
             end_cycle = Simulator.globalSim.getCycles()
-            insert_result(program.__name__, fi_index, fi_cycle, fi_type, fi_result)
+            # if not Testbench.bench.entropy_is_correct(program_name):
+                # entropy_corr = 1
+                # print("### ENTROPY CORRUPTED ###")
+            # insert_result(program.__name__, fi_index, fi_cycle, num_bits, fi_result, end_cycle, entropy_corr)
+            # insert_result(program.__name__, fi_index, fi_cycle, num_bits, fi_result, end_cycle)
             Simulator.globalSim.clear()
 
 def plot_fi_results(program, fi_results: list, cycle_start: int, cycle_end: int, fi_index: int, num_bits: int, fi_type: str):
@@ -95,8 +85,7 @@ def plot_fi_results(program, fi_results: list, cycle_start: int, cycle_end: int,
 def run_bad_bit_test(settings):
     clear_table(settings["program"].__name__)
     for fault_type in ["flip", "set", "clear"]:
-        bits = [i for i in range(4, 31) if i not in [6, 12, 14]]
-        for bit_index in bits:
+        for bit_index in range(0, 24):
             print(f"\nInjecting \'{fault_type}\' faults into bit {bit_index}")
             settings["fi_index"] = bit_index
             settings["fi_type"] = fault_type
@@ -105,22 +94,25 @@ def run_bad_bit_test(settings):
 def run_fi_test(settings):
     clear_table(settings["program"].__name__)
 
-    bits = [i for i in range(4, 31) if i not in [6, 12, 14]]
+    bits = [i for i in range(31)]
     for bit_index in bits:
-        print(f"\nInjecting \'{settings["fault_type"]}\' faults into bit {bit_index}")
-        settings["fi_index"] = bit_index
-        settings["fi_type"] = settings["fault_type"]
-        inject_faults(**settings)
+        num_bits_range = [i for i in range (1, (32 - bit_index)+1)]
+        for num_bits in num_bits_range:
+            print(f"\nInjecting {num_bits} fault(s) starting with bit {bit_index}")
+            settings["fi_index"] = bit_index
+            settings["num_bits"] = num_bits
+            inject_faults(**settings)
 
 if __name__ == "__main__":
+    bench = Testbench()
     settings = {
-        "program": programs.memset,
-        "core_type": "single_entropy",
-        "cycle_start": 1,
-        "cycle_end": 106,
-        "fi_index": 0,
-        "num_bits": 1,
-        "fi_type": "flip"
+        "program": programs.atoi,
+        "core_type": "single",
+        "cycle_start": 68,
+        "cycle_end": 69,
+        "fi_index": 8,
+        "num_bits": 1
     }
 
-    fi_results = run_bad_bit_test(settings)
+    # run_fi_test(settings)
+    inject_faults(**settings)
